@@ -348,13 +348,23 @@
       }
 
       function formatAllowedDatesErr(allowed, p) {
+        var extras =
+          p && p.allowedDatesExtra && p.allowedDatesExtra.length
+            ? p.allowedDatesExtra.slice()
+            : [];
+        // fallback: SEN dates often sit outside weekday window in allowed[]
+        if (!extras.length && allowed && p && p.dateStart && p.dateEnd) {
+          allowed.forEach(function (d) {
+            if (d < p.dateStart || d > p.dateEnd) extras.push(d);
+          });
+        }
         var parts = [];
         if (p && p.dateStart && p.dateEnd) {
           parts.push(
             "平日 " + formatZhDate(p.dateStart) + "至" + formatZhDate(p.dateEnd)
           );
         }
-        (p && p.allowedDatesExtra ? p.allowedDatesExtra : []).forEach(function (d) {
+        extras.forEach(function (d) {
           parts.push("SEN " + formatZhDate(d));
         });
         if (parts.length) return parts.join("；");
@@ -399,6 +409,9 @@
         if (allowed.length) row.dataset.allowedDates = allowed.join(",");
         if (p.dateStart) row.dataset.dateStart = p.dateStart;
         if (p.dateEnd) row.dataset.dateEnd = p.dateEnd;
+        if (p.allowedDatesExtra && p.allowedDatesExtra.length) {
+          row.dataset.allowedExtra = p.allowedDatesExtra.join(",");
+        }
 
         var dateAttrs = "";
         if (p.dateStart) dateAttrs += ' min="' + escapeHtml(p.dateStart) + '"';
@@ -533,6 +546,60 @@
         return geocodeMapGov(q).catch(function () {
           return geocodeNominatim(q);
         });
+      }
+
+      function normalizePlace(s) {
+        return String(s || "")
+          .toLowerCase()
+          .replace(/[\s\u3000]+/g, "")
+          .replace(/[0-9０-９]+/g, "")
+          .replace(/[\u0021-\u002f\u003a-\u0040\u005b-\u0060\u007b-\u007e]/g, "");
+      }
+
+      function placeTokens(s) {
+        var raw = String(s || "").trim();
+        var out = [];
+        // CJK bigrams + latin words length>=2
+        var lat = raw.toLowerCase().match(/[a-z]{2,}/g) || [];
+        lat.forEach(function (w) { out.push(w); });
+        var cjk = raw.replace(/[a-zA-Z0-9\s]+/g, "");
+        for (var i = 0; i < cjk.length - 1; i++) {
+          out.push(cjk.slice(i, i + 2));
+        }
+        if (cjk.length === 1) out.push(cjk);
+        return out;
+      }
+
+      /** @returns {"ok"|"ask"|"no"} */
+      function geocodeConfidence(q, hit) {
+        if (!hit) return "no";
+        var hay = normalizePlace(
+          (hit.matchName || "") + (hit.matchAddr || "")
+        );
+        var qn = normalizePlace(q);
+        if (!hay || !qn) return "no";
+        if (hay.indexOf(qn) >= 0 || (qn.length >= 2 && qn.indexOf(normalizePlace(hit.matchName)) >= 0 && normalizePlace(hit.matchName).length >= 2)) {
+          return "ok";
+        }
+        var toks = placeTokens(q);
+        if (!toks.length) return "no";
+        var hitN = 0;
+        toks.forEach(function (tok) {
+          if (hay.indexOf(normalizePlace(tok)) >= 0 || hay.indexOf(tok) >= 0) hitN++;
+        });
+        var ratio = hitN / toks.length;
+        if (ratio >= 0.5) return "ok";
+        if (ratio >= 0.25) return "ask";
+        return "no";
+      }
+
+      function confirmGeocodeHit(hit) {
+        var label =
+          (hit.matchName || "") +
+          (hit.matchAddr ? "（" + hit.matchAddr + "）" : "");
+        return window.confirm(
+          "是否指：" + (label || "此座標") + "？\n確認後先落 pin；取消可改寫地址再試。"
+        );
       }
 
       function filterCentres(q) {
@@ -839,6 +906,18 @@ out.push(item);
             if (!hit) {
               showErr("搵唔到，可改寫地址再試");
               return;
+            }
+            var conf = geocodeConfidence(q, hit);
+            if (conf === "no") {
+              showErr("搵唔到，可改寫地址再試");
+              return;
+            }
+            if (conf === "ask" || conf === "ok") {
+              // E1: always confirm matched place before pinning manual geocode
+              if (!confirmGeocodeHit(hit)) {
+                showErr("搵唔到，可改寫地址再試");
+                return;
+              }
             }
             centreLat.value = String(hit.lat);
             centreLng.value = String(hit.lng);

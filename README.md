@@ -1,12 +1,11 @@
-# DSE 考試地點助手 — M2 PWA (uat6.1)
+# DSE 考試地點助手 — M2
 
-靜態 PWA：接 M1 2026 資料 + 地政總署／map.gov.hk 底圖（Leaflet XYZ）。檔案喺 repository root，GitHub Pages 由 `/` 發佈。
-
-**Pages:** https://slapp-commits.github.io/dse-exam-centres/
+靜態 PWA：接 M1 2026 資料 + 地政總署／map.gov.hk 底圖（Leaflet XYZ）。
 
 ## 開啟
 
 ```bash
+cd dse-m2
 python3 -m http.server 8080
 # 開 http://localhost:8080/
 ```
