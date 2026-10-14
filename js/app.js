@@ -293,21 +293,11 @@
         if (currentState === 0) applyState(1, true);
       }
     });
+    // N15: highlight only — never panTo/setZoom on select (keeps pins stable)
     Object.keys(markersById).forEach(function (eid) {
       var m = markersById[eid];
       if (!m) return;
-      if (eid === id) {
-        m.setZIndexOffset(1000);
-        if (opts.fromPin || opts.fromCard) {
-          var ll = m.getLatLng();
-          if (ll && isFinite(ll.lat) && isFinite(ll.lng)) {
-            map.panTo(ll, { animate: true });
-            if (map.getZoom() < 14) map.setZoom(15);
-          }
-        }
-      } else {
-        m.setZIndexOffset(0);
-      }
+      m.setZIndexOffset(eid === id ? 1000 : 0);
     });
   }
 
