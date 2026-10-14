@@ -690,6 +690,10 @@
         centrePicked.innerHTML = "";
       }
 
+      function closeAc() {
+        acList.classList.remove("open");
+      }
+
       centreInput.addEventListener("input", function () {
         clearCentre();
         renderAc(filterCentres(centreInput.value));
@@ -698,9 +702,24 @@
         renderAc(filterCentres(centreInput.value));
       });
       centreInput.addEventListener("blur", function () {
-        setTimeout(function () {
-          acList.classList.remove("open");
-        }, 150);
+        setTimeout(closeAc, 150);
+      });
+      // E3: Esc／Enter／儲存先收起列表，唔擋住儲存掣
+      centreInput.addEventListener("keydown", function (e) {
+        if (!acList.classList.contains("open")) return;
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeAc();
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          closeAc();
+          centreInput.blur();
+        }
+      });
+      btnSave.addEventListener("pointerdown", function () {
+        closeAc();
       });
 
       function showErr(msg) {
@@ -743,6 +762,7 @@ out.push(item);
 
       form.addEventListener("submit", function (e) {
         e.preventDefault();
+        closeAc();
         showErr("");
         doSave();
       });

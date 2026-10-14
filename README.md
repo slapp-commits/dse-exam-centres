@@ -12,6 +12,11 @@ python3 -m http.server 8080
 
 PWA／Add to Home Screen 需要 https 或 localhost。
 
+## 軟發布（給考生）
+
+- 預覽：https://slapp-commits.github.io/dse-exam-centres/
+- App 內「安裝／分享」：iOS Safari「加至主畫面」、Android Chrome「加到主畫面」、可分享連結
+
 ## DoD 對照
 
 1. 讀入 `centres_geocoded`／subjects／timetable（打包喺 `data/sample.js`）

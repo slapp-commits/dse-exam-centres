@@ -481,6 +481,92 @@
     fitAllMarkers();
   });
 
+  // Soft: install / share guidance
+  var SHARE_URL = "https://slapp-commits.github.io/dse-exam-centres/";
+  var TIP_KEY = "dse_install_tip_v1";
+  var installSheet = document.getElementById("installSheet");
+  var installTip = document.getElementById("installTip");
+  var btnInstallHelp = document.getElementById("btnInstallHelp");
+
+  function openInstallSheet() {
+    if (!installSheet) return;
+    installSheet.classList.add("open");
+    installSheet.setAttribute("aria-hidden", "false");
+  }
+  function closeInstallSheet() {
+    if (!installSheet) return;
+    installSheet.classList.remove("open");
+    installSheet.setAttribute("aria-hidden", "true");
+  }
+
+  if (btnInstallHelp) {
+    btnInstallHelp.addEventListener("click", openInstallSheet);
+  }
+  var tipOpen = document.getElementById("tipOpenHelp");
+  var tipDismiss = document.getElementById("tipDismiss");
+  if (tipOpen) {
+    tipOpen.addEventListener("click", function () {
+      try { localStorage.setItem(TIP_KEY, "1"); } catch (e) {}
+      if (installTip) installTip.classList.remove("open");
+      openInstallSheet();
+    });
+  }
+  if (tipDismiss) {
+    tipDismiss.addEventListener("click", function () {
+      try { localStorage.setItem(TIP_KEY, "1"); } catch (e) {}
+      if (installTip) installTip.classList.remove("open");
+    });
+  }
+  if (installSheet) {
+    installSheet.addEventListener("click", function (e) {
+      if (e.target === installSheet) closeInstallSheet();
+    });
+  }
+  var btnCloseInstall = document.getElementById("btnCloseInstall");
+  if (btnCloseInstall) btnCloseInstall.addEventListener("click", closeInstallSheet);
+
+  var btnShareApp = document.getElementById("btnShareApp");
+  if (btnShareApp) {
+    btnShareApp.addEventListener("click", function () {
+      if (navigator.share) {
+        navigator
+          .share({
+            title: "DSE 考試地點助手",
+            text: "DSE 試場地圖預覽",
+            url: SHARE_URL,
+          })
+          .catch(function () {});
+      } else {
+        copyShareUrl();
+      }
+    });
+  }
+  function copyShareUrl() {
+    var ok = function () {
+      var b = document.getElementById("btnCopyLink");
+      if (b) {
+        var old = b.textContent;
+        b.textContent = "已複製";
+        setTimeout(function () { b.textContent = old; }, 1200);
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(SHARE_URL).then(ok).catch(function () {
+        window.prompt("複製呢條連結：", SHARE_URL);
+      });
+    } else {
+      window.prompt("複製呢條連結：", SHARE_URL);
+    }
+  }
+  var btnCopyLink = document.getElementById("btnCopyLink");
+  if (btnCopyLink) btnCopyLink.addEventListener("click", copyShareUrl);
+
+  try {
+    if (!localStorage.getItem(TIP_KEY) && installTip) {
+      installTip.classList.add("open");
+    }
+  } catch (e) {}
+
   initMap();
   applyState(1, false);
   renderAndMaybeFit();

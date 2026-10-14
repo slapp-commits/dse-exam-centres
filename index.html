@@ -16,6 +16,7 @@
   <div class="app" id="app">
     <header class="topbar">
       <h1>DSE 考試地點助手</h1>
+      <button type="button" class="btn-help" id="btnInstallHelp" aria-label="安裝或分享">安裝／分享</button>
       <label class="sort-wrap" for="sortMode">
         <span class="sort-label">排序</span>
         <select id="sortMode" aria-label="排序">
@@ -24,6 +25,37 @@
         </select>
       </label>
     </header>
+
+    <div class="install-tip" id="installTip" role="status">
+      想離線／更快開啟？可加到主畫面，或分享連結俾同學。
+      <div>
+        <button type="button" class="tip-go" id="tipOpenHelp">了解點樣做</button>
+        <button type="button" class="tip-dismiss" id="tipDismiss">暫時唔使</button>
+      </div>
+    </div>
+
+    <div class="install-sheet" id="installSheet" aria-hidden="true">
+      <div class="install-sheet-card" role="dialog" aria-labelledby="installTitle">
+        <h2 id="installTitle">加到主畫面／分享</h2>
+        <p>預覽版連結：<br/><a id="shareUrlText" href="https://slapp-commits.github.io/dse-exam-centres/">slapp-commits.github.io/dse-exam-centres</a></p>
+        <p><strong>iPhone／iPad（Safari）</strong></p>
+        <ol>
+          <li>用 Safari 打開上面連結</li>
+          <li>撳底部分享掣 □↑</li>
+          <li>揀「加至主畫面」→ 新增</li>
+        </ol>
+        <p><strong>Android（Chrome）</strong></p>
+        <ol>
+          <li>用 Chrome 打開連結</li>
+          <li>選單 ⋮ →「加到主畫面」／「安裝應用程式」</li>
+        </ol>
+        <div class="install-actions">
+          <button type="button" class="primary" id="btnShareApp">分享連結</button>
+          <button type="button" id="btnCopyLink">複製連結</button>
+          <button type="button" id="btnCloseInstall">關閉</button>
+        </div>
+      </div>
+    </div>
 
     <div class="map-area" id="mapArea" aria-label="地圖">
       <div id="map" class="leaflet-map"></div>
