@@ -293,12 +293,23 @@
         if (currentState === 0) applyState(1, true);
       }
     });
-    // N15: highlight only — never panTo/setZoom on select (keeps pins stable)
+    // N15 / E4: marker click = highlight only; drawer card = flyTo pin
     Object.keys(markersById).forEach(function (eid) {
       var m = markersById[eid];
       if (!m) return;
       m.setZIndexOffset(eid === id ? 1000 : 0);
     });
+    if (opts.fromCard) {
+      var pin = markersById[id];
+      if (pin && map) {
+        if (currentState === 2 || currentState === 0) applyState(1, true);
+        var ll = pin.getLatLng();
+        var z = map.getZoom();
+        if (!z || z < 15) z = 15;
+        if (z > 17) z = 16;
+        map.flyTo(ll, z, { duration: 0.55 });
+      }
+    }
   }
 
   function showDefaultActions(actionsEl, exam) {
@@ -343,7 +354,7 @@
     if (!btn) return;
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
-      selectExam(exam.id, { fromCard: true });
+      selectExam(exam.id, {});
       showConfirmActions(actionsEl, exam);
     });
   }
