@@ -1,4 +1,4 @@
-# DSE 考試地點助手 — M2
+# 我的試場（DSE 試場地圖）— M2／soft
 
 靜態 PWA：接 M1 2026 資料 + 地政總署／map.gov.hk 底圖（Leaflet XYZ）。
 

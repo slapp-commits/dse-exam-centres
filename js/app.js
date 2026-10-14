@@ -531,8 +531,8 @@
       if (navigator.share) {
         navigator
           .share({
-            title: "DSE 考試地點助手",
-            text: "DSE 試場地圖預覽",
+            title: "我的試場",
+            text: "我的試場 — DSE 試場地圖",
             url: SHARE_URL,
           })
           .catch(function () {});

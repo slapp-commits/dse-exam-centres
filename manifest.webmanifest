@@ -1,7 +1,7 @@
 {
-  "name": "DSE 考試地點助手",
-  "short_name": "DSE地點",
-  "description": "DSE 試場地圖助手（M2）— 地政總署底圖",
+  "name": "我的試場",
+  "short_name": "我的試場",
+  "description": "DSE 試場地圖 — 睇考試地點同倒數",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
