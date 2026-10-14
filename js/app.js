@@ -20,7 +20,7 @@
     return {
       collapsed: 56,
       mid: Math.round(h * 0.45),
-      expanded: Math.max(200, h - topbar),
+      expanded: Math.max(200, h - topbar - 64), // leave strip for FAB (N18)
     };
   }
 
@@ -298,8 +298,13 @@
       if (!m) return;
       if (eid === id) {
         m.setZIndexOffset(1000);
-        map.panTo(m.getLatLng(), { animate: true });
-        if (map.getZoom() < 14) map.setZoom(15);
+        if (opts.fromPin || opts.fromCard) {
+          var ll = m.getLatLng();
+          if (ll && isFinite(ll.lat) && isFinite(ll.lng)) {
+            map.panTo(ll, { animate: true });
+            if (map.getZoom() < 14) map.setZoom(15);
+          }
+        }
       } else {
         m.setZIndexOffset(0);
       }
@@ -449,16 +454,20 @@
       });
     }
 
-    if (bounds.length === 1) {
-      map.setView(bounds[0], 16);
-    } else if (bounds.length > 1) {
-      map.fitBounds(L.latLngBounds(bounds).pad(0.25));
-    }
-
+    // N7: do not auto-fit on every render/sort — only 「我的考試」 / first paint
     if (selectedId && markersById[selectedId]) {
-      selectExam(selectedId, {});
+      selectExam(selectedId, {}); // highlight only, no pan
     } else if (selectedId && !list.some(function (e) { return e.id === selectedId; })) {
       selectedId = null;
+    }
+  }
+
+  var didInitialFit = false;
+  function renderAndMaybeFit() {
+    render();
+    if (!didInitialFit) {
+      didInitialFit = true;
+      fitAllMarkers();
     }
   }
 
@@ -473,5 +482,5 @@
 
   initMap();
   applyState(1, false);
-  render();
+  renderAndMaybeFit();
 })();

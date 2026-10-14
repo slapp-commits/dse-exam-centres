@@ -153,7 +153,8 @@ body {
 .fab {
   position: absolute;
   right: 16px;
-  bottom: calc(var(--drawer-h) + 16px);
+  /* Cap so full-height drawer cannot push FAB off-screen (N18) */
+  bottom: min(calc(var(--drawer-h) + 16px), calc(100% - var(--topbar-h) - 68px));
   width: 52px;
   height: 52px;
   border-radius: 50%;

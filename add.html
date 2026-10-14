@@ -58,9 +58,14 @@
         <input type="hidden" id="centreLng" name="centreLng" />
       </div>
 
+      <div class="field hidden" id="manualVenueField">
+        <label for="manualAddr">場地地址 <span class="hint">人手填寫後儲存時會嘗試定位</span></label>
+        <input type="text" id="manualAddr" name="manualAddr" placeholder="輸入完整地址或場地名…" autocomplete="street-address" />
+      </div>
+
       <!-- Exam schedule -->
       <div class="field schedule-block" id="scheduleBlock">
-        <div class="section-label">Exam schedule</div>
+        <div class="section-label">考試時間</div>
         <div id="papersHost"></div>
       </div>
 
@@ -213,11 +218,13 @@
       });
 
       subjectEl.addEventListener("change", function () {
+        showErr("");
         clearCentre();
         centreInput.value = "";
         acList.classList.remove("open");
         syncLanguageVisibility();
         updateCentreHint();
+        toggleManualVenue();
       });
 
       /* ——— Compact read-only + manual rows ——— */
@@ -320,11 +327,17 @@
         if (p.dateStart && p.dateEnd) {
           var cur = new Date(p.dateStart + "T12:00:00");
           var end = new Date(p.dateEnd + "T12:00:00");
+          var weekdaysOnly =
+            p.paper === "P4" ||
+            (p.allowedDatesExtra && p.allowedDatesExtra.length);
           while (cur <= end) {
-            var y = cur.getFullYear();
-            var m = String(cur.getMonth() + 1).padStart(2, "0");
-            var d = String(cur.getDate()).padStart(2, "0");
-            set[y + "-" + m + "-" + d] = true;
+            var dow = cur.getDay(); // 0 Sun … 6 Sat
+            if (!weekdaysOnly || (dow !== 0 && dow !== 6)) {
+              var y = cur.getFullYear();
+              var m = String(cur.getMonth() + 1).padStart(2, "0");
+              var d = String(cur.getDate()).padStart(2, "0");
+              set[y + "-" + m + "-" + d] = true;
+            }
             cur.setDate(cur.getDate() + 1);
           }
         }
@@ -332,6 +345,22 @@
           if (d) set[d] = true;
         });
         return Object.keys(set).sort();
+      }
+
+      function formatAllowedDatesErr(allowed, p) {
+        var parts = [];
+        if (p && p.dateStart && p.dateEnd) {
+          parts.push(
+            "平日 " + formatZhDate(p.dateStart) + "至" + formatZhDate(p.dateEnd)
+          );
+        }
+        (p && p.allowedDatesExtra ? p.allowedDatesExtra : []).forEach(function (d) {
+          parts.push("SEN " + formatZhDate(d));
+        });
+        if (parts.length) return parts.join("；");
+        if (!allowed || !allowed.length) return "";
+        if (allowed.length === 1) return formatZhDate(allowed[0]);
+        return formatZhDate(allowed[0]) + "至" + formatZhDate(allowed[allowed.length - 1]);
       }
 
       function windowHintText(p) {
@@ -386,7 +415,7 @@
           escapeHtml(isOral ? "P4" : isPractical ? "實習" : p.paper) +
           "）" +
           escapeHtml(label) +
-          (isOral ? " · Speaking" : "") +
+          (isOral ? " · 口試" : "") +
           "</div>" +
           '<div class="paper-hint">' +
           escapeHtml(hint) +
@@ -419,6 +448,91 @@
         if (!subj) return [];
         if (SAMPLE.centresForSubject) return SAMPLE.centresForSubject(subj.id);
         return SAMPLE.centres;
+      }
+
+      function toggleManualVenue() {
+        var field = document.getElementById("manualVenueField");
+        var addr = document.getElementById("manualAddr");
+        if (!field || !addr) return;
+        var pool = centresPool();
+        var subj = currentSubject();
+        var need = subj && (!pool || !pool.length);
+        field.classList.toggle("hidden", !need);
+        if (!need) addr.value = "";
+      }
+
+
+      function loadProj4() {
+        return new Promise(function (resolve, reject) {
+          if (window.proj4) {
+            resolve(window.proj4);
+            return;
+          }
+          var s = document.createElement("script");
+          s.src = "https://cdn.jsdelivr.net/npm/proj4@2.11.0/dist/proj4.js";
+          s.onload = function () { resolve(window.proj4); };
+          s.onerror = function () { reject(new Error("proj4 load failed")); };
+          document.head.appendChild(s);
+        });
+      }
+
+      function geocodeMapGov(q) {
+        var url =
+          "https://www.map.gov.hk/gs/api/v1.0.0/locationSearch?q=" +
+          encodeURIComponent(q);
+        return fetch(url, { headers: { Accept: "application/json" } })
+          .then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
+          .then(function (payload) {
+            if (!payload || !payload.length) return null;
+            var top = payload[0];
+            return loadProj4().then(function (proj4) {
+              proj4.defs(
+                "EPSG:2326",
+                "+proj=tmerc +lat_0=22.31213333333334 +lon_0=114.1785555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,0.067753,-2.243649,-1.158827,-1.094246 +units=m +no_defs"
+              );
+              var wgs = proj4("EPSG:2326", "EPSG:4326", [
+                Number(top.x),
+                Number(top.y),
+              ]);
+              return {
+                lng: Math.round(wgs[0] * 1e6) / 1e6,
+                lat: Math.round(wgs[1] * 1e6) / 1e6,
+                matchName: top.nameZH || top.nameEN || "",
+                matchAddr: top.addressZH || top.addressEN || "",
+              };
+            });
+          });
+      }
+
+      function geocodeNominatim(q) {
+        var url =
+          "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=hk&q=" +
+          encodeURIComponent(q);
+        return fetch(url, {
+          headers: { Accept: "application/json" },
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(function (arr) {
+          if (!arr || !arr.length) return null;
+          return {
+            lat: Math.round(Number(arr[0].lat) * 1e6) / 1e6,
+            lng: Math.round(Number(arr[0].lon) * 1e6) / 1e6,
+            matchName: arr[0].display_name || "",
+            matchAddr: arr[0].display_name || "",
+          };
+        });
+      }
+
+      function geocodeAddress(q) {
+        q = (q || "").trim();
+        if (!q) return Promise.resolve(null);
+        return geocodeMapGov(q).catch(function () {
+          return geocodeNominatim(q);
+        });
       }
 
       function filterCentres(q) {
@@ -563,6 +677,10 @@ out.push(item);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         showErr("");
+        doSave();
+      });
+
+      function doSave() {
 
         var subj = currentSubject();
         if (!subj) {
@@ -647,15 +765,18 @@ out.push(item);
           var allowed = allowedStr.split(",");
           var dv = row.querySelector(".p-date").value;
           if (dv && allowed.indexOf(dv) < 0) {
+            var paperMeta = {
+              dateStart: row.dataset.dateStart || "",
+              dateEnd: row.dataset.dateEnd || "",
+              allowedDatesExtra: (row.dataset.allowedExtra || "")
+                .split(",")
+                .filter(Boolean),
+            };
             showErr(
               "「" +
                 (row.dataset.labelZh || row.dataset.paper) +
-                "」日期只可以係窗期內（" +
-                formatZhDate(allowed[0]) +
-                (allowed.length > 1
-                  ? "至" + formatZhDate(allowed[allowed.length - 1])
-                  : "") +
-                "，或提示所列 SEN 日期）"
+                "」日期只可以係：" +
+                formatAllowedDatesErr(allowed, paperMeta)
             );
             return;
           }
@@ -665,31 +786,71 @@ out.push(item);
         if (langInput.value === "zh") langLabel = "中文卷";
         if (langInput.value === "en") langLabel = "英文卷";
 
-        var entry = {
-          id: editId || ExamStore.uid(),
-          subjectId: subj.id,
-          subjectNameZh: subj.nameZh,
-          lang: langInput.value || null,
-          langLabel: langLabel || null,
-          centreCode: centreCode.value,
-          centreNameZh: centreName.value,
-          addressZh: centreAddr.value,
-          lat: centreLat.value ? Number(centreLat.value) : null,
-          lng: centreLng.value ? Number(centreLng.value) : null,
-          papers: papers,
-        };
-
-        if (editId) {
-          var prev = ExamStore.get(editId);
-          if (prev && prev.createdAt) entry.createdAt = prev.createdAt;
-          else entry.createdAt = new Date().toISOString();
-          ExamStore.update(editId, entry);
-        } else {
-          entry.createdAt = new Date().toISOString();
-          ExamStore.add(entry);
+        var manualAddrEl = document.getElementById("manualAddr");
+        if (manualAddrEl && manualAddrEl.value.trim()) {
+          centreAddr.value = manualAddrEl.value.trim();
+          if (!centreName.value) centreName.value = centreInput.value.trim() || manualAddrEl.value.trim();
         }
-        window.location.href = "index.html";
-      });
+
+        function persist(lat, lng) {
+          var entry = {
+            id: editId || ExamStore.uid(),
+            subjectId: subj.id,
+            subjectNameZh: subj.nameZh,
+            lang: langInput.value || null,
+            langLabel: langLabel || null,
+            centreCode: centreCode.value,
+            centreNameZh: centreName.value,
+            addressZh: centreAddr.value,
+            lat: lat,
+            lng: lng,
+            papers: papers,
+          };
+          if (editId) {
+            var prev = ExamStore.get(editId);
+            if (prev && prev.createdAt) entry.createdAt = prev.createdAt;
+            else entry.createdAt = new Date().toISOString();
+            ExamStore.update(editId, entry);
+          } else {
+            entry.createdAt = new Date().toISOString();
+            ExamStore.add(entry);
+          }
+          window.location.href = "index.html";
+        }
+
+        var lat = centreLat.value ? Number(centreLat.value) : null;
+        var lng = centreLng.value ? Number(centreLng.value) : null;
+        // N6: library coords kept; only geocode when missing
+        if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
+          persist(lat, lng);
+          return;
+        }
+        var q = (centreAddr.value || centreName.value || centreInput.value || "").trim();
+        if (!q) {
+          persist(null, null);
+          return;
+        }
+        btnSave.disabled = true;
+        btnSave.textContent = "定位中…";
+        geocodeAddress(q)
+          .then(function (hit) {
+            btnSave.disabled = false;
+            btnSave.textContent = "儲存";
+            if (!hit) {
+              showErr("搵唔到，可改寫地址再試");
+              return;
+            }
+            centreLat.value = String(hit.lat);
+            centreLng.value = String(hit.lng);
+            if (hit.matchAddr && !centreAddr.value) centreAddr.value = hit.matchAddr;
+            persist(hit.lat, hit.lng);
+          })
+          .catch(function () {
+            btnSave.disabled = false;
+            btnSave.textContent = "儲存";
+            showErr("搵唔到，可改寫地址再試");
+          });
+      }
 
       document.getElementById("btnBack").addEventListener("click", function () {
         window.location.href = "index.html";
@@ -746,9 +907,16 @@ out.push(item);
           refreshSchedule();
         }
 
-        var centre = SAMPLE.centres.find(function (c) {
+        var pool = centresPool();
+        var centre = pool.find(function (c) {
           return c.code === exam.centreCode;
         });
+        if (!centre && SAMPLE.centres) {
+          // fallback only if code not in subject pool (legacy)
+          centre = SAMPLE.centres.find(function (c) {
+            return c.code === exam.centreCode;
+          });
+        }
         if (centre) {
           pickCentre(centre);
         } else {
@@ -760,6 +928,7 @@ out.push(item);
             lng: exam.lng,
           });
         }
+        toggleManualVenue();
       }
 
       loadEdit();
