@@ -1,0 +1,144 @@
+/* M2: real map + filters on top of v0.4 shell */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.topbar h1 {
+  flex: 1;
+  min-width: 0;
+}
+.btn-filter {
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #222;
+}
+.btn-filter.active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.filter-panel {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 10px 14px 12px;
+  display: grid;
+  gap: 8px;
+}
+.filter-panel[hidden] {
+  display: none !important;
+}
+.filter-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.filter-row select,
+.filter-row input {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+}
+.btn-clear-filters {
+  justify-self: start;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 13px;
+  padding: 4px 0;
+  text-decoration: underline;
+}
+
+.map-area {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  bottom: var(--drawer-h, 50%);
+  background: #e8e8e8;
+  overflow: hidden;
+}
+.leaflet-map {
+  width: 100%;
+  height: 100%;
+}
+.map-attrib-note {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 500;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 10px;
+  color: #444;
+  pointer-events: none;
+}
+.map-label,
+.map-svg,
+.pin-count {
+  display: none !important;
+}
+
+.drawer-count {
+  font-weight: 400;
+  color: #666;
+  font-size: 13px;
+}
+.exam-countdown {
+  font-size: 12px;
+  color: #b45309;
+  margin-top: 2px;
+}
+.empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: #777;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Leaflet above drawer chrome but below FAB */
+.leaflet-control-container {
+  font-size: 12px;
+}
+
+/* Trap Leaflet panes so they cannot cover chrome */
+.map-area {
+  z-index: 1;
+  isolation: isolate;
+}
+.topbar {
+  position: relative;
+  z-index: 40;
+}
+.filter-panel {
+  z-index: 45;
+}
+.drawer {
+  z-index: 30 !important;
+}
+.fab {
+  z-index: 35 !important;
+}
+.drawer-title {
+  cursor: pointer;
+  user-select: none;
+}
+.drawer-title:active {
+  opacity: 0.7;
+}

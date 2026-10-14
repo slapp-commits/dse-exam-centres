@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>DSE 考試地點助手</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/m2.css" />
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="topbar">
+      <h1>DSE 考試地點助手</h1>
+      <label class="sort-wrap" for="sortMode">
+        <span class="sort-label">排序</span>
+        <select id="sortMode" aria-label="排序">
+          <option value="input">加入順序</option>
+          <option value="exam">考試時間（由近到遠）</option>
+        </select>
+      </label>
+    </header>
+
+    <div class="map-area" id="mapArea" aria-label="地圖">
+      <div id="map" class="leaflet-map"></div>
+    </div>
+
+    <a class="fab" href="add.html" title="新增考試" aria-label="新增考試">+</a>
+
+    <section class="drawer" id="drawer" data-state="mid" aria-label="考試列表">
+      <div class="drawer-handle-zone" id="drawerHandle" role="slider" aria-valuemin="0" aria-valuemax="2" aria-valuenow="1" aria-label="拖曳抽屜高度">
+        <div class="drawer-handle" aria-hidden="true"></div>
+      </div>
+      <div class="drawer-title" id="drawerTitle" title="撳一下顯示全部試場">我的考試 <span class="drawer-count" id="drawerCount"></span></div>
+      <div class="drawer-list" id="examList"></div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="data/sample.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>

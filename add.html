@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>新增考試 — DSE 考試地點助手</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <button type="button" class="btn-back" id="btnBack" aria-label="返回">‹</button>
+      <h1 id="pageTitle">新增考試</h1>
+      <span class="badge">甲類科目</span>
+    </header>
+
+    <form class="form-page" id="examForm" autocomplete="off">
+      <div class="dup-banner" id="dupBanner" role="alert"></div>
+
+      <!-- 科目 -->
+      <div class="field">
+        <label for="subject">科目</label>
+        <select id="subject" name="subject" required>
+          <option value="">請選擇科目</option>
+        </select>
+      </div>
+
+      <!-- Language (bilingual only) -->
+      <div class="field hidden" id="langField">
+        <label>試卷語言</label>
+        <div class="lang-chooser" id="langChooser" role="group" aria-label="試卷語言">
+          <button type="button" class="lang-opt" data-lang="zh">中文卷</button>
+          <button type="button" class="lang-opt" data-lang="en">英文卷</button>
+        </div>
+        <input type="hidden" id="lang" name="lang" value="" />
+      </div>
+
+      <!-- 試場編號 autocomplete — one subject = one venue -->
+      <div class="field">
+        <label for="centreInput">試場編號 <span class="hint" id="centreHint">筆試試場</span></label>
+        <div class="ac-wrap">
+          <input
+            type="text"
+            id="centreInput"
+            name="centreInput"
+            placeholder="輸入編號或學校名稱…"
+            autocomplete="off"
+          />
+          <div class="ac-list" id="acList" role="listbox"></div>
+        </div>
+        <div class="centre-picked" id="centrePicked"></div>
+        <input type="hidden" id="centreCode" name="centreCode" />
+        <input type="hidden" id="centreName" name="centreName" />
+        <input type="hidden" id="centreAddr" name="centreAddr" />
+        <input type="hidden" id="centreLat" name="centreLat" />
+        <input type="hidden" id="centreLng" name="centreLng" />
+      </div>
+
+      <!-- Exam schedule -->
+      <div class="field schedule-block" id="scheduleBlock">
+        <div class="section-label">Exam schedule</div>
+        <div id="papersHost"></div>
+      </div>
+
+      <p class="err" id="formErr"></p>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-save" id="btnSave">儲存</button>
+      </div>
+      <p class="data-source" id="dataSource">資料來源：<a href="https://www.hkeaa.edu.hk/tc/hkdse/admin/exam_centres/exam_centres.html" target="_blank" rel="noopener">考評局 — 試場一覽表</a></p>
+    </form>
+  </div>
+
+  <script src="data/sample.js"></script>
+  <script src="js/storage.js"></script>
+  <script>
+    (function () {
+      var subjectEl = document.getElementById("subject");
+      var langField = document.getElementById("langField");
+      var langChooser = document.getElementById("langChooser");
+      var langInput = document.getElementById("lang");
+      var centreInput = document.getElementById("centreInput");
+      var acList = document.getElementById("acList");
+      var centrePicked = document.getElementById("centrePicked");
+      var centreCode = document.getElementById("centreCode");
+      var centreName = document.getElementById("centreName");
+      var centreAddr = document.getElementById("centreAddr");
+      var centreLat = document.getElementById("centreLat");
+      var centreLng = document.getElementById("centreLng");
+      var scheduleBlock = document.getElementById("scheduleBlock");
+      var papersHost = document.getElementById("papersHost");
+      var formErr = document.getElementById("formErr");
+      var form = document.getElementById("examForm");
+      var dupBanner = document.getElementById("dupBanner");
+      var btnSave = document.getElementById("btnSave");
+      var editId = null;
+      var savedManual = {}; // paperKey → saved values when editing
+      var blockedDuplicate = false;
+
+      SAMPLE.subjects.forEach(function (s) {
+        var opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.nameZh;
+        subjectEl.appendChild(opt);
+      });
+
+      function currentSubject() {
+        return SAMPLE.subjects.find(function (s) {
+          return s.id === subjectEl.value;
+        });
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function formatDateZh(iso) {
+        if (!iso) return "";
+        var p = iso.split("-");
+        if (p.length !== 3) return iso;
+        return Number(p[1]) + "月" + Number(p[2]) + "日";
+      }
+
+      function paperLabel(p) {
+        if (p.labelZh) return p.labelZh;
+        if (p.paper === "PRACTICAL") return "實習";
+        return SAMPLE.getPaperLabel
+          ? SAMPLE.getPaperLabel(subjectEl.value, p.paper)
+          : p.paper;
+      }
+
+      /* ——— Duplicate subject check ——— */
+      function checkDuplicate() {
+        dupBanner.classList.remove("visible");
+        dupBanner.innerHTML = "";
+        blockedDuplicate = false;
+        btnSave.disabled = false;
+
+        var subj = currentSubject();
+        if (!subj || editId) return; // editing own entry is fine
+
+        var existing = ExamStore.findBySubject(subj.id, null);
+        if (!existing) return;
+
+        blockedDuplicate = true;
+        btnSave.disabled = true;
+        dupBanner.innerHTML =
+          "已儲存「" +
+          escapeHtml(subj.nameZh) +
+          "」。不可重複新增。" +
+          ' <a href="add.html?id=' +
+          encodeURIComponent(existing.id) +
+          '">前往編輯</a>';
+        dupBanner.classList.add("visible");
+      }
+
+      
+      function updateCentreHint() {
+        var hint = document.getElementById("centreHint");
+        if (!hint) return;
+        var subj = currentSubject();
+        if (!subj) {
+          hint.textContent = "先選科目";
+          return;
+        }
+        var n = centresPool().length;
+        if (subj.hasOral) hint.textContent = "口試試場（" + n + "）";
+        else if (subj.hasPractical) {
+          hint.textContent = n
+            ? "實習試場（" + n + "）"
+            : "公開表無此科試場，請手動填編號／名稱";
+        } else hint.textContent = "筆試試場（" + n + " 間跟科目）";
+      }
+
+      function syncLanguageVisibility() {
+        var subj = currentSubject();
+        langChooser.classList.remove("visible");
+        langField.classList.add("hidden");
+        langInput.value = "";
+        Array.prototype.forEach.call(
+          langChooser.querySelectorAll(".lang-opt"),
+          function (btn) {
+            btn.classList.remove("selected");
+          }
+        );
+
+        if (subj && subj.bilingual) {
+          langField.classList.remove("hidden");
+          langChooser.classList.add("visible");
+        }
+        updateCentreHint();
+        checkDuplicate();
+        refreshSchedule();
+      }
+
+      langChooser.addEventListener("click", function (e) {
+        var btn = e.target.closest(".lang-opt");
+        if (!btn) return;
+        Array.prototype.forEach.call(
+          langChooser.querySelectorAll(".lang-opt"),
+          function (b) {
+            b.classList.toggle("selected", b === btn);
+          }
+        );
+        langInput.value = btn.getAttribute("data-lang");
+        refreshSchedule();
+      });
+
+      subjectEl.addEventListener("change", function () {
+        clearCentre();
+        centreInput.value = "";
+        acList.classList.remove("open");
+        syncLanguageVisibility();
+        updateCentreHint();
+      });
+
+      /* ——— Compact read-only + manual rows ——— */
+      function refreshSchedule(overridePapers) {
+        var subj = currentSubject();
+        papersHost.innerHTML = "";
+        scheduleBlock.classList.remove("visible");
+        if (!subj) return;
+
+        var lang = langInput.value;
+        if (subj.bilingual && !lang) return;
+
+        var papers =
+          overridePapers || SAMPLE.getTimetable(subj.id, lang || null);
+        if (!papers.length) return;
+
+        scheduleBlock.classList.add("visible");
+
+        var readonly = [];
+        var manual = [];
+        papers.forEach(function (p) {
+          if (p.userEntered) manual.push(p);
+          else readonly.push(p);
+        });
+
+        if (readonly.length) {
+          papersHost.appendChild(buildCompactBlock(readonly));
+        }
+        manual.forEach(function (p) {
+          papersHost.appendChild(buildManualRow(p));
+        });
+      }
+
+      function buildCompactBlock(papers) {
+        // Group by date for compact display
+        var byDate = {};
+        var order = [];
+        papers.forEach(function (p) {
+          var d = p.date || "";
+          if (!byDate[d]) {
+            byDate[d] = [];
+            order.push(d);
+          }
+          byDate[d].push(p);
+        });
+
+        var wrap = document.createElement("div");
+        wrap.className = "schedule-compact";
+        wrap.setAttribute("data-readonly", "1");
+
+        order.forEach(function (d) {
+          var group = document.createElement("div");
+          group.className = "compact-group";
+          if (d) {
+            var dateEl = document.createElement("div");
+            dateEl.className = "compact-date";
+            dateEl.textContent = formatDateZh(d);
+            group.appendChild(dateEl);
+          }
+          var line = document.createElement("div");
+          line.className = "compact-line";
+          var bits = byDate[d].map(function (p) {
+            var time =
+              (p.start || "") + (p.end ? "–" + p.end : "");
+            // Compact: (P1) 08:30–10:00; for P3 append clear Chinese label
+            if (p.paper === "P3") {
+              return "（P3）" + time + "  " + paperLabel(p);
+            }
+            return "（" + p.paper + "）" + time;
+          });
+          line.textContent = bits.join("  ");
+          // Store data on dataset for collect
+          byDate[d].forEach(function (p) {
+            var hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.className = "ro-paper";
+            hidden.dataset.paper = p.paper;
+            hidden.dataset.labelZh = paperLabel(p);
+            hidden.dataset.date = p.date || "";
+            hidden.dataset.start = p.start || "";
+            hidden.dataset.end = p.end || "";
+            group.appendChild(hidden);
+          });
+          group.appendChild(line);
+          wrap.appendChild(group);
+        });
+        return wrap;
+      }
+
+      function formatZhDate(iso) {
+        if (!iso) return "";
+        var p = String(iso).split("-");
+        if (p.length !== 3) return iso;
+        return Number(p[0]) + "年" + Number(p[1]) + "月" + Number(p[2]) + "號";
+      }
+
+      function allowedDatesForPaper(p) {
+        var set = {};
+        if (p.date) set[p.date] = true;
+        if (p.dateStart && p.dateEnd) {
+          var cur = new Date(p.dateStart + "T12:00:00");
+          var end = new Date(p.dateEnd + "T12:00:00");
+          while (cur <= end) {
+            var y = cur.getFullYear();
+            var m = String(cur.getMonth() + 1).padStart(2, "0");
+            var d = String(cur.getDate()).padStart(2, "0");
+            set[y + "-" + m + "-" + d] = true;
+            cur.setDate(cur.getDate() + 1);
+          }
+        }
+        (p.allowedDatesExtra || []).forEach(function (d) {
+          if (d) set[d] = true;
+        });
+        return Object.keys(set).sort();
+      }
+
+      function windowHintText(p) {
+        if (p.note) return p.note;
+        var parts = [];
+        if (p.dateStart && p.dateEnd) {
+          parts.push(
+            "公開窗期：" + formatZhDate(p.dateStart) + "至" + formatZhDate(p.dateEnd)
+          );
+        }
+        (p.allowedDatesExtra || []).forEach(function (d) {
+          parts.push("SEN：" + formatZhDate(d));
+        });
+        if (parts.length) return "請按准考證填實際時段。" + parts.join("；");
+        var isOral = p.paper === "P4";
+        var isPractical = p.paper === "PRACTICAL";
+        if (isOral) return "口試時間由考生自行填寫（非公開時間表）；試場見上方";
+        if (isPractical) return "實習時段由考生自行填寫；試場見上方";
+        return "請自行填寫日期／時間";
+      }
+
+      function buildManualRow(p) {
+        var key = p.paper;
+        var saved = savedManual[key] || {};
+        var label = paperLabel(p);
+        var isOral = p.paper === "P4";
+        var isPractical = p.paper === "PRACTICAL";
+        var hint = windowHintText(p);
+        var allowed = allowedDatesForPaper(p);
+
+        var row = document.createElement("div");
+        row.className = "paper-manual";
+        row.dataset.paper = p.paper;
+        row.dataset.labelZh = label;
+        row.dataset.userEntered = "1";
+        if (allowed.length) row.dataset.allowedDates = allowed.join(",");
+        if (p.dateStart) row.dataset.dateStart = p.dateStart;
+        if (p.dateEnd) row.dataset.dateEnd = p.dateEnd;
+
+        var dateAttrs = "";
+        if (p.dateStart) dateAttrs += ' min="' + escapeHtml(p.dateStart) + '"';
+        if (p.dateEnd && !(p.allowedDatesExtra || []).length) {
+          dateAttrs += ' max="' + escapeHtml(p.dateEnd) + '"';
+        } else if (allowed.length) {
+          // with SEN outside range: use overall min/max for picker, validate strictly on submit
+          dateAttrs += ' min="' + escapeHtml(allowed[0]) + '"';
+          dateAttrs += ' max="' + escapeHtml(allowed[allowed.length - 1]) + '"';
+        }
+
+        row.innerHTML =
+          '<div class="paper-tag">（' +
+          escapeHtml(isOral ? "P4" : isPractical ? "實習" : p.paper) +
+          "）" +
+          escapeHtml(label) +
+          (isOral ? " · Speaking" : "") +
+          "</div>" +
+          '<div class="paper-hint">' +
+          escapeHtml(hint) +
+          "</div>" +
+          '<div class="row-grid full">' +
+          "<div><label>日期</label>" +
+          '<input type="date" class="p-date" value="' +
+          escapeHtml(saved.date || p.date || "") +
+          '"' +
+          dateAttrs +
+          ' required /></div>' +
+          "</div>" +
+          '<div class="row-grid">' +
+          "<div><label>開始</label>" +
+          '<input type="time" class="p-start" value="' +
+          escapeHtml(saved.start || "") +
+          '" required /></div>' +
+          "<div><label>結束</label>" +
+          '<input type="time" class="p-end" value="' +
+          escapeHtml(saved.end || "") +
+          '" /></div>' +
+          "</div>";
+
+        return row;
+      }
+
+      /* ——— Autocomplete ——— */
+      function centresPool() {
+        var subj = currentSubject();
+        if (!subj) return [];
+        if (SAMPLE.centresForSubject) return SAMPLE.centresForSubject(subj.id);
+        return SAMPLE.centres;
+      }
+
+      function filterCentres(q) {
+        var pool = centresPool();
+        q = (q || "").trim().toLowerCase();
+        if (!pool.length) return { items: [], total: 0, q: q };
+        if (!q) return { items: pool, total: pool.length, q: q };
+        var items = pool.filter(function (c) {
+          return (
+            c.code.toLowerCase().indexOf(q) >= 0 ||
+            c.nameZh.toLowerCase().indexOf(q) >= 0 ||
+            (c.addressZh || "").toLowerCase().indexOf(q) >= 0
+          );
+        });
+        return { items: items, total: items.length, q: q };
+      }
+
+      function renderAc(result) {
+        acList.innerHTML = "";
+        var items = result && result.items ? result.items : [];
+        var total = result && result.total != null ? result.total : items.length;
+        if (!items.length) {
+          if (result && result.q) {
+            var empty = document.createElement("div");
+            empty.className = "ac-footer";
+            empty.textContent = "無符合「" + result.q + "」嘅試場（共 " + centresPool().length + " 間）";
+            acList.appendChild(empty);
+            acList.classList.add("open");
+            return;
+          }
+          acList.classList.remove("open");
+          return;
+        }
+        items.forEach(function (c) {
+          var item = document.createElement("div");
+          item.className = "ac-item";
+          item.setAttribute("role", "option");
+          item.innerHTML =
+            '<div class="code">' +
+            escapeHtml(c.code) +
+            "</div>" +
+            '<div class="name">' +
+            escapeHtml(c.nameZh) +
+            "</div>" +
+            '<div class="addr">' +
+            escapeHtml(c.addressZh) +
+            "</div>";
+          item.addEventListener("mousedown", function (e) {
+            e.preventDefault();
+            pickCentre(c);
+          });
+          acList.appendChild(item);
+        });
+        var foot = document.createElement("div");
+        foot.className = "ac-footer";
+        foot.textContent = result && result.q
+          ? "共 " + total + " 間符合 · 可滾動揀"
+          : "共 " + total + " 間 · 可滾動或輸入編號／校名收窄";
+        acList.appendChild(foot);
+        acList.classList.add("open");
+      }
+
+      function pickCentre(c) {
+        centreCode.value = c.code;
+        centreName.value = c.nameZh;
+        centreAddr.value = c.addressZh;
+        centreLat.value = c.lat != null ? String(c.lat) : "";
+        centreLng.value = c.lng != null ? String(c.lng) : "";
+        centreInput.value = c.code;
+        centrePicked.innerHTML =
+          "<strong>" +
+          escapeHtml(c.code) +
+          "</strong> · " +
+          escapeHtml(c.nameZh) +
+          "<br/>" +
+          escapeHtml(c.addressZh);
+        centrePicked.classList.add("visible");
+        acList.classList.remove("open");
+      }
+
+      function clearCentre() {
+        centreCode.value = "";
+        centreName.value = "";
+        centreAddr.value = "";
+        centreLat.value = "";
+        centreLng.value = "";
+        centrePicked.classList.remove("visible");
+        centrePicked.innerHTML = "";
+      }
+
+      centreInput.addEventListener("input", function () {
+        clearCentre();
+        renderAc(filterCentres(centreInput.value));
+      });
+      centreInput.addEventListener("focus", function () {
+        renderAc(filterCentres(centreInput.value));
+      });
+      centreInput.addEventListener("blur", function () {
+        setTimeout(function () {
+          acList.classList.remove("open");
+        }, 150);
+      });
+
+      function showErr(msg) {
+        if (!msg) {
+          formErr.classList.remove("visible");
+          formErr.textContent = "";
+          return;
+        }
+        formErr.textContent = msg;
+        formErr.classList.add("visible");
+      }
+
+      function collectPapers() {
+        var out = [];
+        // read-only hidden fields
+        papersHost.querySelectorAll(".ro-paper").forEach(function (el) {
+          out.push({
+            paper: el.dataset.paper,
+            labelZh: el.dataset.labelZh || "",
+            date: el.dataset.date || "",
+            start: el.dataset.start || "",
+            end: el.dataset.end || "",
+            userEntered: false,
+          });
+        });
+        // manual rows
+        papersHost.querySelectorAll(".paper-manual").forEach(function (row) {
+          var item = {
+            paper: row.dataset.paper,
+            labelZh: row.dataset.labelZh || "",
+            date: row.querySelector(".p-date").value,
+            start: row.querySelector(".p-start").value,
+            end: (row.querySelector(".p-end") || {}).value || "",
+            userEntered: true,
+          };
+out.push(item);
+        });
+        return out;
+      }
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        showErr("");
+
+        var subj = currentSubject();
+        if (!subj) {
+          showErr("請選擇科目");
+          return;
+        }
+        if (blockedDuplicate) {
+          showErr("此科目已存在，請前往編輯");
+          return;
+        }
+        if (subj.bilingual && !langInput.value) {
+          showErr("請選擇試卷語言（中文卷／英文卷）");
+          return;
+        }
+        if (!centreCode.value) {
+          var pool = centresPool();
+          var typed = (centreInput.value || "").trim();
+          // music_prac / pe_prac 等公開表無資料：允許手動輸入
+          if (!pool.length && typed) {
+            centreCode.value = typed;
+            centreName.value = typed;
+            centreAddr.value = centreAddr.value || "";
+          } else {
+            showErr(pool.length ? "請從列表選擇試場" : "請手動輸入試場編號或名稱");
+            return;
+          }
+        }
+        if (!scheduleBlock.classList.contains("visible")) {
+          showErr("考試時間表未能載入");
+          return;
+        }
+
+        // Re-check duplicate at save time
+        if (!editId) {
+          var existing = ExamStore.findBySubject(subj.id, null);
+          if (existing) {
+            checkDuplicate();
+            showErr("此科目已存在，請前往編輯");
+            return;
+          }
+        }
+
+        var papers = collectPapers();
+        if (!papers.length) {
+          showErr("考試時間表未能載入");
+          return;
+        }
+        // Validate: at least one timed paper; manual rows must be filled
+        var hasTimed = papers.some(function (p) {
+          return p.date && p.start;
+        });
+        if (!hasTimed) {
+          showErr("請填寫開考時間");
+          return;
+        }
+        for (var i = 0; i < papers.length; i++) {
+          if (papers[i].userEntered && (!papers[i].date || !papers[i].start)) {
+            showErr(
+              "請填寫「" +
+                (papers[i].labelZh || papers[i].paper) +
+                "」的日期與開始時間"
+            );
+            return;
+          }
+          if (papers[i].userEntered && papers[i].start && papers[i].end) {
+            if (papers[i].end <= papers[i].start) {
+              showErr(
+                "「" +
+                  (papers[i].labelZh || papers[i].paper) +
+                  "」開始時間要早過結束時間"
+              );
+              return;
+            }
+          }
+        }
+        // #8 allowed dates from timetable window
+        var manualRows = papersHost.querySelectorAll(".paper-manual");
+        for (var r = 0; r < manualRows.length; r++) {
+          var row = manualRows[r];
+          var allowedStr = row.dataset.allowedDates || "";
+          if (!allowedStr) continue;
+          var allowed = allowedStr.split(",");
+          var dv = row.querySelector(".p-date").value;
+          if (dv && allowed.indexOf(dv) < 0) {
+            showErr(
+              "「" +
+                (row.dataset.labelZh || row.dataset.paper) +
+                "」日期只可以係窗期內（" +
+                formatZhDate(allowed[0]) +
+                (allowed.length > 1
+                  ? "至" + formatZhDate(allowed[allowed.length - 1])
+                  : "") +
+                "，或提示所列 SEN 日期）"
+            );
+            return;
+          }
+        }
+
+        var langLabel = "";
+        if (langInput.value === "zh") langLabel = "中文卷";
+        if (langInput.value === "en") langLabel = "英文卷";
+
+        var entry = {
+          id: editId || ExamStore.uid(),
+          subjectId: subj.id,
+          subjectNameZh: subj.nameZh,
+          lang: langInput.value || null,
+          langLabel: langLabel || null,
+          centreCode: centreCode.value,
+          centreNameZh: centreName.value,
+          addressZh: centreAddr.value,
+          lat: centreLat.value ? Number(centreLat.value) : null,
+          lng: centreLng.value ? Number(centreLng.value) : null,
+          papers: papers,
+        };
+
+        if (editId) {
+          var prev = ExamStore.get(editId);
+          if (prev && prev.createdAt) entry.createdAt = prev.createdAt;
+          else entry.createdAt = new Date().toISOString();
+          ExamStore.update(editId, entry);
+        } else {
+          entry.createdAt = new Date().toISOString();
+          ExamStore.add(entry);
+        }
+        window.location.href = "index.html";
+      });
+
+      document.getElementById("btnBack").addEventListener("click", function () {
+        window.location.href = "index.html";
+      });
+
+      /* ——— Edit mode ——— */
+      function loadEdit() {
+        var params = new URLSearchParams(window.location.search);
+        var id = params.get("id");
+        if (!id) {
+          langField.classList.add("hidden");
+          return;
+        }
+        var exam = ExamStore.get(id);
+        if (!exam) {
+          langField.classList.add("hidden");
+          return;
+        }
+        editId = id;
+        document.getElementById("pageTitle").textContent = "編輯考試";
+
+        // Preserve user-entered paper values
+        (exam.papers || []).forEach(function (p) {
+          if (p.userEntered) {
+            savedManual[p.paper] = {
+              date: p.date || "",
+              start: p.start || "",
+              end: p.end || "",
+              centreCode: p.centreCode || "",
+              addressZh: p.addressZh || "",
+            };
+          }
+        });
+
+        subjectEl.value = exam.subjectId;
+        // Disable subject change on edit to keep 1:1 subject rule simple
+        subjectEl.disabled = true;
+
+        syncLanguageVisibility();
+
+        if (exam.lang) {
+          langInput.value = exam.lang;
+          Array.prototype.forEach.call(
+            langChooser.querySelectorAll(".lang-opt"),
+            function (btn) {
+              btn.classList.toggle(
+                "selected",
+                btn.getAttribute("data-lang") === exam.lang
+              );
+            }
+          );
+          refreshSchedule();
+        } else {
+          refreshSchedule();
+        }
+
+        var centre = SAMPLE.centres.find(function (c) {
+          return c.code === exam.centreCode;
+        });
+        if (centre) {
+          pickCentre(centre);
+        } else {
+          pickCentre({
+            code: exam.centreCode,
+            nameZh: exam.centreNameZh,
+            addressZh: exam.addressZh,
+            lat: exam.lat,
+            lng: exam.lng,
+          });
+        }
+      }
+
+      loadEdit();
+    })();
+  </script>
+</body>
+</html>
