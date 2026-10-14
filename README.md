@@ -1,4 +1,4 @@
-# DSE 考試地點助手 — M2 PWA (uat6)
+# DSE 考試地點助手 — M2 PWA (uat6.1)
 
 靜態 PWA：接 M1 2026 資料 + 地政總署／map.gov.hk 底圖（Leaflet XYZ）。檔案喺 repository root，GitHub Pages 由 `/` 發佈。
 
