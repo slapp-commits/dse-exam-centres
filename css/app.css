@@ -953,3 +953,27 @@ button.icon-btn {
 .exam-card[data-pin-num] .exam-card-main {
   padding-left: 30px;
 }
+
+
+/* Temporary ?demo=states banner — remove with the demo seed */
+.demo-states-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 12px;
+  padding: 8px 12px;
+  text-align: center;
+  line-height: 1.4;
+}
+.demo-states-banner a {
+  color: #a8e0c4;
+  margin-left: 8px;
+  font-weight: 600;
+}
+body:has(.demo-states-banner) .topbar {
+  margin-top: 36px;
+}

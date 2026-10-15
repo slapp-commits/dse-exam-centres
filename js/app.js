@@ -206,7 +206,96 @@
     return '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>';
   }
 
+  function isDemoStates() {
+    try {
+      return new URLSearchParams(window.location.search).get("demo") === "states";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function pad2(n) {
+    return n < 10 ? "0" + n : String(n);
+  }
+
+  function isoDateOffset(days) {
+    var d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() + days);
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
+  /** Temporary soft.1.x preview — does not write ExamStore. Remove after UAT. */
+  function demoStateExams() {
+    return [
+      {
+        id: "demo_done",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        subjectId: "demo_done",
+        subjectNameZh: "示範·已考完",
+        centreCode: "A1000",
+        centreNameZh: "英皇書院",
+        addressZh: "香港般咸道63號A",
+        lat: 22.284249,
+        lng: 114.140253,
+        lang: "zh",
+        papers: [
+          {
+            paper: "1",
+            labelZh: "卷一",
+            date: isoDateOffset(-3),
+            start: "08:30",
+            end: "10:00",
+          },
+        ],
+      },
+      {
+        id: "demo_upcoming",
+        createdAt: "2026-01-02T00:00:00.000Z",
+        subjectId: "demo_up",
+        subjectNameZh: "示範·即將",
+        centreCode: "A1200",
+        centreNameZh: "聖若瑟書院",
+        addressZh: "香港堅尼地道7號",
+        lat: 22.276431,
+        lng: 114.158798,
+        lang: "zh",
+        papers: [
+          {
+            paper: "1",
+            labelZh: "卷一",
+            date: isoDateOffset(5),
+            start: "08:30",
+            end: "10:00",
+          },
+        ],
+      },
+      {
+        id: "demo_last",
+        createdAt: "2026-01-03T00:00:00.000Z",
+        subjectId: "demo_last",
+        subjectNameZh: "示範·最後一科",
+        centreCode: "A1100",
+        centreNameZh: "高主教書院",
+        addressZh: "香港羅便臣道2號",
+        lat: 22.282592,
+        lng: 114.143722,
+        lang: "zh",
+        papers: [
+          {
+            paper: "1",
+            labelZh: "卷一",
+            date: isoDateOffset(12),
+            start: "08:30",
+            end: "11:30",
+          },
+        ],
+      },
+    ];
+  }
+
   function listedExams() {
+    if (isDemoStates()) return demoStateExams();
     var mode = (sortMode && sortMode.value) || "input";
     if (ExamStore.sortedBy) return ExamStore.sortedBy(mode);
     return ExamStore.sorted();
@@ -455,9 +544,9 @@
   }
 
   function deleteExam(id) {
+    if (String(id).indexOf("demo_") === 0) return;
     ExamStore.remove(id);
     if (selectedId === id) selectedId = null;
-    
     render();
   }
 
@@ -701,6 +790,19 @@
       if (window.DseAnalytics) window.DseAnalytics.track("app_install");
     }
   } catch (e) {}
+
+
+  if (isDemoStates()) {
+    var bar = document.createElement("div");
+    bar.className = "demo-states-banner";
+    bar.setAttribute("role", "status");
+    bar.innerHTML =
+      "示範模式：三種狀態 pin（唔影響你儲存嘅考試）。" +
+      '<a href="./">離開示範</a>';
+    document.body.appendChild(bar);
+    var fab = document.querySelector(".fab");
+    if (fab) fab.style.display = "none";
+  }
 
   initMap();
   applyState(1, false);
