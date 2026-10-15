@@ -37,7 +37,7 @@
     <div class="install-sheet" id="installSheet" aria-hidden="true">
       <div class="install-sheet-card" role="dialog" aria-labelledby="installTitle">
         <h2 id="installTitle">加到主畫面／分享</h2>
-        <p>預覽版連結：<br/><a id="shareUrlText" href="https://slapp-commits.github.io/dse-exam-centres/">slapp-commits.github.io/dse-exam-centres</a></p>
+        <p><strong>我的試場</strong> — 預覽版連結：<br/><a id="shareUrlText" href="https://slapp-commits.github.io/dse-exam-centres/">slapp-commits.github.io/dse-exam-centres</a></p>
         <p><strong>iPhone／iPad（Safari）</strong></p>
         <ol>
           <li>用 Safari 打開上面連結</li>
@@ -75,6 +75,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="data/sample.js"></script>
   <script src="js/storage.js"></script>
+  <script>window.DSE_PLAUSIBLE_DOMAIN="";</script>
+  <script src="js/analytics.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

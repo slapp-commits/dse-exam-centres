@@ -1,4 +1,4 @@
-const CACHE = 'dse-m2-v12';
+const CACHE = 'dse-m2-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './css/m2.css',
   './js/storage.js',
   './js/app.js',
+  './js/analytics.js',
   './data/sample.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

@@ -265,14 +265,36 @@
     if (markerLayer) markerLayer.clearLayers();
   }
 
-  function upsertMarker(exam) {
-    if (exam.lat == null || exam.lng == null || isNaN(exam.lat) || isNaN(exam.lng)) {
-      return null;
-    }
-    var m = L.marker([exam.lat, exam.lng], {
-      title: exam.centreNameZh || exam.subjectNameZh,
-      riseOnHover: true,
+  function pinIcon(num, selected) {
+    var cls = "pin-num" + (selected ? " is-selected" : "");
+    return L.divIcon({
+      className: cls,
+      html: '<span class="pin-num-inner">' + String(num) + "</span>",
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -14],
     });
+  }
+
+  function hasCoords(exam) {
+    return (
+      exam &&
+      exam.lat != null &&
+      exam.lng != null &&
+      !isNaN(exam.lat) &&
+      !isNaN(exam.lng)
+    );
+  }
+
+  function upsertMarker(exam, num) {
+    if (!hasCoords(exam) || num == null) return null;
+    var m = L.marker([exam.lat, exam.lng], {
+      title: String(num) + " · " + (exam.centreNameZh || exam.subjectNameZh || ""),
+      riseOnHover: true,
+      icon: pinIcon(num, exam.id === selectedId),
+      keyboard: true,
+    });
+    m._dseNum = num;
     m.on("click", function () {
       selectExam(exam.id, { fromPin: true });
     });
@@ -298,6 +320,9 @@
       var m = markersById[eid];
       if (!m) return;
       m.setZIndexOffset(eid === id ? 1000 : 0);
+      if (m._dseNum != null) {
+        m.setIcon(pinIcon(m._dseNum, eid === id));
+      }
     });
     if (opts.fromCard) {
       var pin = markersById[id];
@@ -315,7 +340,7 @@
   function showDefaultActions(actionsEl, exam) {
     actionsEl.classList.remove("confirming");
     actionsEl.innerHTML =
-      '<a class="icon-btn" target="_blank" rel="noopener" href="' +
+      '<a class="icon-btn btn-navigate" target="_blank" rel="noopener" href="' +
       navigateUrl(exam) +
       '">' +
       iconNavigate() +
@@ -331,6 +356,12 @@
       iconDelete() +
       " 刪除</button>";
     wireDeleteActions(actionsEl, exam);
+    var nav = actionsEl.querySelector(".btn-navigate");
+    if (nav) {
+      nav.addEventListener("click", function () {
+        if (window.DseAnalytics) window.DseAnalytics.track("navigate_tap");
+      });
+    }
   }
 
   function showConfirmActions(actionsEl, exam) {
@@ -366,7 +397,7 @@
     render();
   }
 
-  function renderCard(exam) {
+  function renderCard(exam, num) {
     var card = document.createElement("article");
     card.className = "exam-card";
     card.setAttribute("data-exam-id", exam.id);
@@ -374,6 +405,7 @@
     card.setAttribute("tabindex", "0");
     card.setAttribute("aria-pressed", exam.id === selectedId ? "true" : "false");
     if (exam.id === selectedId) card.classList.add("selected");
+    if (num != null) card.setAttribute("data-pin-num", String(num));
 
     var d = daysUntil(exam);
     var countdown =
@@ -392,7 +424,15 @@
       })
       .join("");
 
+    var badge =
+      num != null
+        ? '<span class="card-pin-badge" aria-hidden="true">' +
+          String(num) +
+          "</span>"
+        : "";
+
     card.innerHTML =
+      badge +
       '<div class="exam-card-main">' +
       '<div class="exam-title">' +
       escapeHtml(exam.subjectNameZh || exam.subjectId) +
@@ -448,9 +488,15 @@
           : "尚未加入考試。";
       examList.appendChild(empty);
     } else {
+      var pinOrdinal = 0;
       list.forEach(function (exam) {
-        examList.appendChild(renderCard(exam));
-        var m = upsertMarker(exam);
+        var num = null;
+        if (hasCoords(exam)) {
+          pinOrdinal += 1;
+          num = pinOrdinal;
+        }
+        examList.appendChild(renderCard(exam, num));
+        var m = upsertMarker(exam, num);
         if (m) bounds.push(m.getLatLng());
       });
     }
@@ -564,6 +610,19 @@
   try {
     if (!localStorage.getItem(TIP_KEY) && installTip) {
       installTip.classList.add("open");
+    }
+  } catch (e) {}
+
+  if (window.DseAnalytics) window.DseAnalytics.track("app_open");
+
+  // app_install: standalone / display-mode or iOS home-screen
+  try {
+    var isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true;
+    if (isStandalone && !localStorage.getItem("dse_tracked_install")) {
+      localStorage.setItem("dse_tracked_install", "1");
+      if (window.DseAnalytics) window.DseAnalytics.track("app_install");
     }
   } catch (e) {}
 

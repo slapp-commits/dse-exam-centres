@@ -62,6 +62,9 @@ body {
 }
 
 .topbar h1 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 17px;
   font-weight: 600;
   flex: 1;
@@ -826,3 +829,55 @@ button.icon-btn {
 }
 .install-tip .tip-go { background: #fff; color: #111; }
 .install-tip .tip-dismiss { background: transparent; color: #ccc; text-decoration: underline; padding-left: 4px; }
+
+
+/* F1 numbered pins + card badges */
+.pin-num {
+  background: transparent !important;
+  border: none !important;
+}
+.pin-num-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  border: 2px solid #fff;
+  line-height: 1;
+}
+.pin-num.is-selected .pin-num-inner {
+  background: #c62828;
+  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.35);
+}
+
+.exam-card {
+  position: relative;
+}
+.card-pin-badge {
+  position: absolute;
+  left: 10px;
+  top: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+.exam-card.selected .card-pin-badge {
+  background: #c62828;
+}
+.exam-card[data-pin-num] .exam-card-main {
+  padding-left: 28px;
+}

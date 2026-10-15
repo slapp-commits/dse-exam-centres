@@ -80,6 +80,8 @@
 
   <script src="data/sample.js"></script>
   <script src="js/storage.js"></script>
+  <script>window.DSE_PLAUSIBLE_DOMAIN="";</script>
+  <script src="js/analytics.js"></script>
   <script>
     (function () {
       var subjectEl = document.getElementById("subject");
@@ -901,6 +903,7 @@ out.push(item);
           } else {
             entry.createdAt = new Date().toISOString();
             ExamStore.add(entry);
+            if (window.DseAnalytics) window.DseAnalytics.track("exam_add");
           }
           window.location.href = "index.html";
         }
