@@ -418,7 +418,8 @@
       className: cls,
       html: '<span class="pin-drop-inner">' + glyph + "</span>",
       iconSize: [36, 48],
-      iconAnchor: [18, 46],
+      // Tip of the rotated teardrop (28px box, top 2px, sharp corner down): y = 2+14+14√2 ≈ 35.8
+      iconAnchor: [18, 36],
       popupAnchor: [0, -42],
     });
   }
