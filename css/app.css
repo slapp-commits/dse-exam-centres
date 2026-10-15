@@ -831,29 +831,81 @@ button.icon-btn {
 .install-tip .tip-dismiss { background: transparent; color: #ccc; text-decoration: underline; padding-left: 4px; }
 
 
-/* F1 numbered pins + card badges */
-.pin-num {
+/* F1 C+D hybrid: teardrop tip-down + chalk glyph by state */
+.pin-drop {
   background: transparent !important;
   border: none !important;
 }
-.pin-num-inner {
+.pin-drop-inner {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  width: 36px;
+  height: 48px;
+}
+.pin-drop-inner::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 50%;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: #111;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  margin-left: -14px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
   border: 2px solid #fff;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.28);
+}
+.pin-drop--upcoming .pin-drop-inner::before {
+  background: #c4a8e0;
+}
+.pin-drop--done .pin-drop-inner::before {
+  background: #9a8a9e;
+}
+.pin-drop--last .pin-drop-inner::before {
+  background: #7ec8a3;
+}
+.pin-drop.is-selected .pin-drop-inner::before {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95), 0 0 0 6px rgba(17, 17, 17, 0.22),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.pin-drop-glyph {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  font-family: "Segoe Print", "Comic Sans MS", "Chalkboard SE", "KaiTi", cursive;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  letter-spacing: 0.02em;
+}
+.pin-drop-glyph--last {
+  flex-direction: row;
+  gap: 1px;
+  font-size: 13px;
+}
+.pin-drop-check {
+  font-size: 12px;
   line-height: 1;
 }
-.pin-num.is-selected .pin-num-inner {
-  background: #c62828;
-  box-shadow: 0 0 0 3px rgba(198, 40, 40, 0.35);
+.pin-drop-done-label {
+  font-size: 9px;
+  line-height: 1;
+  margin-top: 1px;
+}
+.pin-drop-ray {
+  display: inline-block;
+  width: 5px;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 1px;
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
 }
 
 .exam-card {
@@ -861,23 +913,43 @@ button.icon-btn {
 }
 .card-pin-badge {
   position: absolute;
-  left: 10px;
+  left: 8px;
   top: 12px;
-  width: 24px;
+  min-width: 26px;
   height: 24px;
-  border-radius: 50%;
-  background: #111;
-  color: #fff;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: #f6f0fa;
+  color: #6f4f96;
+  border: 1.5px solid #c4a8e0;
   font-size: 12px;
   font-weight: 700;
+  font-family: "Segoe Print", "Comic Sans MS", "Chalkboard SE", "KaiTi", cursive;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1;
+  line-height: 1;
+}
+.card-pin-badge--upcoming {
+  background: #f6f0fa;
+  color: #6f4f96;
+  border-color: #c4a8e0;
+}
+.card-pin-badge--done {
+  background: #f3f0f2;
+  color: #6e6274;
+  border-color: #9a8a9e;
+  font-size: 11px;
+}
+.card-pin-badge--last {
+  background: #eef8f3;
+  color: #2f7a5a;
+  border-color: #7ec8a3;
 }
 .exam-card.selected .card-pin-badge {
-  background: #c62828;
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.18);
 }
 .exam-card[data-pin-num] .exam-card-main {
-  padding-left: 28px;
+  padding-left: 30px;
 }

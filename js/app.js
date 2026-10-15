@@ -125,6 +125,48 @@
     return Math.floor((ts - start) / 86400000);
   }
 
+
+  function examEndTs(exam) {
+    if (!exam.papers || !exam.papers.length) return null;
+    var max = -Infinity;
+    exam.papers.forEach(function (p) {
+      if (!p.date) return;
+      var time = p.end || p.start || "00:00";
+      var t = Date.parse(p.date + "T" + time);
+      if (!isNaN(t) && t > max) max = t;
+    });
+    return isFinite(max) ? max : null;
+  }
+
+  function isExamDone(exam) {
+    var end = examEndTs(exam);
+    return end != null && end < Date.now();
+  }
+
+  function findLastExamId(list) {
+    var bestId = null;
+    var bestEnd = -Infinity;
+    var bestCreated = -Infinity;
+    (list || []).forEach(function (exam) {
+      if (isExamDone(exam)) return;
+      var end = examEndTs(exam);
+      if (end == null) return;
+      var created = Date.parse(exam.createdAt || "") || 0;
+      if (end > bestEnd || (end === bestEnd && created > bestCreated)) {
+        bestEnd = end;
+        bestCreated = created;
+        bestId = exam.id;
+      }
+    });
+    return bestId;
+  }
+
+  function examPinState(exam, lastId) {
+    if (isExamDone(exam)) return "done";
+    if (lastId && exam.id === lastId) return "last";
+    return "upcoming";
+  }
+
   function formatDate(iso) {
     if (!iso) return "";
     var p = iso.split("-");
@@ -265,14 +307,30 @@
     if (markerLayer) markerLayer.clearLayers();
   }
 
-  function pinIcon(num, selected) {
-    var cls = "pin-num" + (selected ? " is-selected" : "");
+  function pinIcon(num, selected, state) {
+    state = state || "upcoming";
+    var cls =
+      "pin-drop pin-drop--" +
+      state +
+      (selected ? " is-selected" : "");
+    var glyph;
+    if (state === "done") {
+      glyph =
+        '<span class="pin-drop-glyph"><span class="pin-drop-check">✓</span><span class="pin-drop-done-label">完</span></span>';
+    } else if (state === "last") {
+      glyph =
+        '<span class="pin-drop-glyph pin-drop-glyph--last"><span class="pin-drop-ray" aria-hidden="true"></span>' +
+        String(num) +
+        '<span class="pin-drop-ray" aria-hidden="true"></span></span>';
+    } else {
+      glyph = '<span class="pin-drop-glyph">' + String(num) + "</span>";
+    }
     return L.divIcon({
       className: cls,
-      html: '<span class="pin-num-inner">' + String(num) + "</span>",
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
-      popupAnchor: [0, -14],
+      html: '<span class="pin-drop-inner">' + glyph + "</span>",
+      iconSize: [36, 48],
+      iconAnchor: [18, 46],
+      popupAnchor: [0, -42],
     });
   }
 
@@ -286,15 +344,21 @@
     );
   }
 
-  function upsertMarker(exam, num) {
+  function upsertMarker(exam, num, state) {
     if (!hasCoords(exam) || num == null) return null;
+    state = state || "upcoming";
+    var titleBit =
+      state === "done"
+        ? "完"
+        : String(num);
     var m = L.marker([exam.lat, exam.lng], {
-      title: String(num) + " · " + (exam.centreNameZh || exam.subjectNameZh || ""),
+      title: titleBit + " · " + (exam.centreNameZh || exam.subjectNameZh || ""),
       riseOnHover: true,
-      icon: pinIcon(num, exam.id === selectedId),
+      icon: pinIcon(num, exam.id === selectedId, state),
       keyboard: true,
     });
     m._dseNum = num;
+    m._dseState = state;
     m.on("click", function () {
       selectExam(exam.id, { fromPin: true });
     });
@@ -321,7 +385,7 @@
       if (!m) return;
       m.setZIndexOffset(eid === id ? 1000 : 0);
       if (m._dseNum != null) {
-        m.setIcon(pinIcon(m._dseNum, eid === id));
+        m.setIcon(pinIcon(m._dseNum, eid === id, m._dseState || "upcoming"));
       }
     });
     if (opts.fromCard) {
@@ -397,7 +461,7 @@
     render();
   }
 
-  function renderCard(exam, num) {
+  function renderCard(exam, num, state) {
     var card = document.createElement("article");
     card.className = "exam-card";
     card.setAttribute("data-exam-id", exam.id);
@@ -424,15 +488,25 @@
       })
       .join("");
 
-    var badge =
-      num != null
-        ? '<span class="card-pin-badge" aria-hidden="true">' +
-          String(num) +
-          "</span>"
-        : "";
+    state = state || "upcoming";
+    var badgeHtml = "";
+    if (num != null) {
+      var badgeGlyph =
+        state === "done"
+          ? "✓完"
+          : state === "last"
+            ? "✦" + String(num)
+            : String(num);
+      badgeHtml =
+        '<span class="card-pin-badge card-pin-badge--' +
+        state +
+        '" aria-hidden="true">' +
+        badgeGlyph +
+        "</span>";
+    }
 
     card.innerHTML =
-      badge +
+      badgeHtml +
       '<div class="exam-card-main">' +
       '<div class="exam-title">' +
       escapeHtml(exam.subjectNameZh || exam.subjectId) +
@@ -488,6 +562,7 @@
           : "尚未加入考試。";
       examList.appendChild(empty);
     } else {
+      var lastId = findLastExamId(list);
       var pinOrdinal = 0;
       list.forEach(function (exam) {
         var num = null;
@@ -495,8 +570,9 @@
           pinOrdinal += 1;
           num = pinOrdinal;
         }
-        examList.appendChild(renderCard(exam, num));
-        var m = upsertMarker(exam, num);
+        var state = examPinState(exam, lastId);
+        examList.appendChild(renderCard(exam, num, state));
+        var m = upsertMarker(exam, num, state);
         if (m) bounds.push(m.getLatLng());
       });
     }
