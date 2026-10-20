@@ -505,26 +505,29 @@
   }
 
   function spiderOffsets(count) {
-    var minChord = 54;
+    // Arms are short on purpose: a centre rarely has more than a few exams.
+    // N=2 sits near 52px. N=3–6 stay under the old 80–132px band, with
+    // neighbouring pin heads still far enough apart to tap.
+    var minChord = 46;
     var leg;
     var pts = [];
-    if (count <= 1) return [{ dx: 0, dy: -64 }];
+    if (count <= 1) return [{ dx: 0, dy: -48 }];
     if (count === 2) {
-      leg = 80;
+      leg = 52;
       return [
-        { dx: -leg, dy: -10 },
-        { dx: leg, dy: -10 },
+        { dx: -leg, dy: -6 },
+        { dx: leg, dy: -6 },
       ];
     }
     var step = Math.PI / (count - 1);
     leg = minChord / (2 * Math.sin(step / 2));
-    if (leg < 80) leg = 80;
-    if (leg > 132) leg = 132;
+    if (leg < 56) leg = 56;
+    if (leg > 76) leg = 76;
     for (var i = 0; i < count; i++) {
       var angle = Math.PI - step * i;
       pts.push({
         dx: Math.cos(angle) * leg,
-        dy: -Math.sin(angle) * leg - 8,
+        dy: -Math.sin(angle) * leg - 4,
       });
     }
     return pts;
