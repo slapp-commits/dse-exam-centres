@@ -962,7 +962,7 @@ button.icon-btn {
   padding-left: 30px;
 }
 
-/* ?demo=spiderfy: count pill on a shared-location pin. Not a second exam number. */
+/* Count pill on a shared-location pin. Not a second exam number. */
 .leaflet-marker-icon.pin-drop--cluster {
   overflow: visible !important;
 }

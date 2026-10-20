@@ -4,9 +4,6 @@
   var markerLayer = null;
   var selectedId = null;
   var userLatLng = null;
-  // Opt-in trial only. Official gate is ?demo=spiderfy.
-  // Aliases ?f4=1 and ?f4=spiderfy still open the same trial.
-  var spiderfyDemo = readSpiderfyDemo();
   var highlightedIds = null;
   var clusterByKey = {};
   var anchorById = {};
@@ -25,17 +22,6 @@
   var drag = null;
 
   var sortMode = document.getElementById("sortMode");
-
-  function readSpiderfyDemo() {
-    try {
-      var q = new URLSearchParams(window.location.search);
-      if (q.get("demo") === "spiderfy") return true;
-      var f4 = q.get("f4");
-      return f4 === "1" || f4 === "spiderfy";
-    } catch (e) {
-      return false;
-    }
-  }
 
   function isHighlighted(eid) {
     if (highlightedIds && highlightedIds.length) {
@@ -299,7 +285,7 @@
 
     markerLayer = L.layerGroup().addTo(map);
     map.on("click", function () {
-      if (!spiderfyDemo || !spiderGroupKey) return;
+      if (!spiderGroupKey) return;
       if (Date.now() - spiderOpenedAt < 450) return;
       collapseSpider();
     });
@@ -337,23 +323,16 @@
 
   function fitAllMarkers() {
     var bounds = [];
-    if (spiderfyDemo) {
-      var seen = {};
-      Object.keys(anchorById).forEach(function (id) {
-        var m = anchorById[id];
-        if (!m) return;
-        var ll = m.getLatLng();
-        var key = ll.lat.toFixed(5) + "," + ll.lng.toFixed(5);
-        if (seen[key]) return;
-        seen[key] = true;
-        bounds.push(ll);
-      });
-    } else {
-      Object.keys(markersById).forEach(function (id) {
-        var m = markersById[id];
-        if (m) bounds.push(m.getLatLng());
-      });
-    }
+    var seen = {};
+    Object.keys(anchorById).forEach(function (id) {
+      var m = anchorById[id];
+      if (!m) return;
+      var ll = m.getLatLng();
+      var key = ll.lat.toFixed(5) + "," + ll.lng.toFixed(5);
+      if (seen[key]) return;
+      seen[key] = true;
+      bounds.push(ll);
+    });
     if (!bounds.length || !map) return;
     if (bounds.length === 1) {
       map.setView(bounds[0], 16);
@@ -759,7 +738,7 @@
 
   function selectExam(id, opts) {
     opts = opts || {};
-    if (spiderfyDemo && spiderGroupKey && (opts.fromCard || opts.fromPin)) {
+    if (spiderGroupKey && (opts.fromCard || opts.fromPin)) {
       var stayKey = groupKeyByExamId[id];
       if (stayKey !== spiderGroupKey) collapseSpider();
     }
@@ -789,10 +768,10 @@
         m.setIcon(pinIcon(m._dseNum, on, m._dseState || "upcoming", m._dseBadge || null));
       }
     });
-    if (spiderfyDemo) refreshClusterIcons();
+    refreshClusterIcons();
     if (opts.fromCard) {
       var pin = markersById[id];
-      if (spiderfyDemo && (!pin || pin._spiderDx != null) && anchorById[id]) {
+      if ((!pin || pin._spiderDx != null) && anchorById[id]) {
         pin = anchorById[id];
       }
       if (pin && map) {
@@ -977,14 +956,9 @@
         }
         var state = examPinState(exam, lastId);
         examList.appendChild(renderCard(exam, num, state));
-        if (!spiderfyDemo) {
-          var m = upsertMarker(exam, num, state);
-          if (m) bounds.push(m.getLatLng());
-        } else {
-          entries.push({ exam: exam, num: num, state: state });
-        }
+        entries.push({ exam: exam, num: num, state: state });
       });
-      if (spiderfyDemo) placeSpiderfyMarkers(entries, bounds);
+      placeSpiderfyMarkers(entries, bounds);
     }
 
     if (highlightedIds && highlightedIds.length) {
@@ -1000,11 +974,9 @@
     }
 
     // N7: do not auto-fit on every render/sort — only 「我的考試」 / first paint
-    if (selectedId && markersById[selectedId]) {
+    if (selectedId && (markersById[selectedId] || anchorById[selectedId])) {
       selectExam(selectedId, highlightRestoreOpts()); // highlight only, no pan
-    } else if (spiderfyDemo && selectedId && anchorById[selectedId]) {
-      selectExam(selectedId, highlightRestoreOpts());
-    } else if (spiderfyDemo && highlightedIds && highlightedIds.length) {
+    } else if (highlightedIds && highlightedIds.length) {
       selectExam(highlightedIds[0], highlightRestoreOpts());
     }
   }
