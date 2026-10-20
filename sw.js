@@ -1,4 +1,4 @@
-const CACHE = 'dse-m2-v23';
+const CACHE = 'dse-m2-v24';
 const ASSETS = [
   './',
   './index.html',
