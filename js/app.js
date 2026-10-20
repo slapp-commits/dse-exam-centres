@@ -574,6 +574,18 @@
     removeSpiderVisuals();
     spiderGroupKey = null;
     spiderCenter = null;
+    selectedId = null;
+    highlightedIds = null;
+    document.querySelectorAll(".exam-card").forEach(function (card) {
+      card.classList.remove("selected");
+      card.setAttribute("aria-pressed", "false");
+    });
+    Object.keys(markersById).forEach(function (eid) {
+      var m = markersById[eid];
+      if (!m || m._dseNum == null) return;
+      m.setZIndexOffset(0);
+      m.setIcon(pinIcon(m._dseNum, false, m._dseState || "upcoming", m._dseBadge || null));
+    });
     var cluster = key && clusterByKey[key];
     if (cluster && markerLayer && !markerLayer.hasLayer(cluster)) {
       cluster.addTo(markerLayer);
@@ -744,15 +756,15 @@
 
   function selectExam(id, opts) {
     opts = opts || {};
+    if (spiderfyDemo && spiderGroupKey && (opts.fromCard || opts.fromPin)) {
+      var stayKey = groupKeyByExamId[id];
+      if (stayKey !== spiderGroupKey) collapseSpider();
+    }
     selectedId = id;
     if (opts.highlightIds && opts.highlightIds.length > 1) {
       highlightedIds = opts.highlightIds.slice();
     } else {
       highlightedIds = null;
-    }
-    if (spiderfyDemo && spiderGroupKey && (opts.fromCard || opts.fromPin)) {
-      var stayKey = groupKeyByExamId[id];
-      if (stayKey !== spiderGroupKey) collapseSpider();
     }
     document.querySelectorAll(".exam-card").forEach(function (card) {
       var eid = card.getAttribute("data-exam-id");
