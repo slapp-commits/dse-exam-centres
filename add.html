@@ -74,7 +74,11 @@
       <div class="form-actions">
         <button type="submit" class="btn-save" id="btnSave">儲存</button>
       </div>
-      <p class="data-source" id="dataSource">資料來源：<a href="https://www.hkeaa.edu.hk/tc/hkdse/admin/exam_centres/exam_centres.html" target="_blank" rel="noopener">考評局 — 試場一覽表</a></p>
+      <p class="data-source" id="dataSource">
+        <span class="src-kicker">資料來源</span>
+        <span class="src-line"><a href="https://www.hkeaa.edu.hk/tc/hkdse/admin/exam_centres/exam_centres.html" target="_blank" rel="noopener">考評局 — 試場一覽表</a></span>
+        <span class="src-line"><a href="https://www.hkeaa.edu.hk/DocLibrary/Circulars/HKDSE/HKDSE_Exam_Circular_No8_2027_Examination_Timetable_and_Date_of_Release_of_Results_C.pdf" target="_blank" rel="noopener">暫定時間表 · 考評局通告 (8) 2025/2026，2026-05-22</a></span>
+      </p>
     </form>
   </div>
 
@@ -106,6 +110,8 @@
       var savedManual = {}; // paperKey → saved values when editing
       var blockedDuplicate = false;
 
+      renderDataSource();
+
       SAMPLE.subjects.forEach(function (s) {
         var opt = document.createElement("option");
         opt.value = s.id;
@@ -125,6 +131,49 @@
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;");
+      }
+
+      function sourceLink(url, text) {
+        var safe = escapeHtml(text);
+        if (!url) return safe;
+        return (
+          '<a href="' +
+          escapeHtml(url) +
+          '" target="_blank" rel="noopener">' +
+          safe +
+          "</a>"
+        );
+      }
+
+      /* Centres list + timetable. Text and provisional status come from SAMPLE.meta. */
+      function renderDataSource() {
+        var el = document.getElementById("dataSource");
+        if (!el || !window.SAMPLE || !SAMPLE.meta) return;
+        var meta = SAMPLE.meta;
+        var centresUrl = meta.centresSourceUrl || SAMPLE.sourceUrl || "";
+        var centresLabel = meta.centresSourceLabelZh || "試場一覽表";
+        var lines = [sourceLink(centresUrl, "考評局 — " + centresLabel)];
+
+        var status = meta.timetableStatus || "";
+        var kind =
+          meta.timetableSourceLabelZh ||
+          (status === "provisional" ? "暫定時間表" : "考試時間表");
+        if (status === "provisional" && kind.indexOf("暫定") < 0) {
+          kind += "（暫定）";
+        }
+        var cite = meta.timetableCitationZh || "";
+        var timetableLabel = kind + (cite ? " · " + cite : "");
+        if (cite || meta.timetableSourceUrl || meta.timetableSource) {
+          lines.push(sourceLink(meta.timetableSourceUrl || "", timetableLabel));
+        }
+
+        el.innerHTML =
+          '<span class="src-kicker">資料來源</span>' +
+          lines
+            .map(function (html) {
+              return '<span class="src-line">' + html + "</span>";
+            })
+            .join("");
       }
 
       function formatDateZh(iso) {
