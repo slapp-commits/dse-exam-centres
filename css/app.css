@@ -720,11 +720,19 @@ button.icon-btn {
   margin: 12px 4px 24px;
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.5;
+  line-height: 1.55;
+}
+.data-source .src-kicker,
+.data-source .src-line {
+  display: block;
+}
+.data-source .src-line + .src-line {
+  margin-top: 2px;
 }
 .data-source a {
   color: inherit;
   text-decoration: underline;
+  overflow-wrap: anywhere;
 }
 
 

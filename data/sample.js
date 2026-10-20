@@ -36,8 +36,11 @@
     });
   }
 
+  var meta = {"centresSource": "HKEAA + CSDI geocode", "geocodeHits": 428, "mapBasemap": "LandsD XYZ via mapapi.geodata.gov.hk", "timetableStatus": "provisional", "timetableSource": "HKEAA Examination Circular No. (8) 2025/2026 dated 22 May 2026 (Ref: DSE/CR 3/2026), Annex 1 — Examination Timetable for 2027 HKDSE", "timetableSourceUrl": "https://www.hkeaa.edu.hk/DocLibrary/Circulars/HKDSE/HKDSE_Exam_Circular_No8_2027_Examination_Timetable_and_Date_of_Release_of_Results_C.pdf", "timetableCitationZh": "考評局通告 (8) 2025/2026，2026-05-22", "timetableSourceLabelZh": "暫定時間表", "centresSourceLabelZh": "試場一覽表", "centresSourceUrl": "https://www.hkeaa.edu.hk/tc/hkdse/admin/exam_centres/exam_centres.html", "timetableNote": "Provisional 2027 timetable. Literature in English, Technology & Living, Physical Education and Music dates are tentative until finalisation in early November 2026.", "tentativeEarmarkedDates": {"eng_lit": ["2027-04-20", "2027-04-29", "2027-05-03"], "tl": ["2027-04-07", "2027-04-29", "2027-05-03"], "pe_written": ["2027-04-29", "2027-05-03"], "music_written": ["2027-04-29", "2027-05-03"], "pe_prac": {"dateStart": "2027-02-20", "dateEnd": "2027-03-31", "wording": "late February – late March 2027"}, "music_prac": {"dateStart": "2027-03-01", "dateEnd": "2027-03-15", "wording": "early March – mid-March 2027"}}, "oralWindow": {"normal": {"dateStart": "2027-03-15", "dateEnd": "2027-03-31", "start": "17:00", "end": "20:30", "wording": "mid-March – late March 2027 (Monday to Friday, 5:00 pm – 8:30 pm)"}, "sen": {"dateStart": "2027-03-21", "dateEnd": "2027-03-31", "wording": "late March 2027; exact day not published in the 22 May 2026 circular"}}, "clockTimes": "Written start/end times are the existing paper durations. The 22 May 2026 circular publishes AM/PM sessions only; the only clock time given is English Language speaking normal sessions 17:00–20:30."};
+
   global.SAMPLE = {
-    sourceUrl: "https://www.hkeaa.edu.hk/tc/hkdse/admin/exam_centres/exam_centres.html",
+    sourceUrl: meta.centresSourceUrl,
+    meta: meta,
     centres: centres,
     subjects: subjects,
     timetable: timetable,
