@@ -4,6 +4,19 @@
   var markerLayer = null;
   var selectedId = null;
   var userLatLng = null;
+  // Opt-in trial only. Official gate is ?demo=spiderfy.
+  // Aliases ?f4=1 and ?f4=spiderfy still open the same trial.
+  var spiderfyDemo = readSpiderfyDemo();
+  var highlightedIds = null;
+  var clusterByKey = {};
+  var anchorById = {};
+  var groupKeyByExamId = {};
+  var spiderGroupKey = null;
+  var spiderCenter = null;
+  var spiderChildren = [];
+  var spiderLegs = [];
+  var spiderHub = null;
+  var spiderOpenedAt = 0;
 
   var STATES = ["collapsed", "mid", "expanded"];
   var drawer = document.getElementById("drawer");
@@ -12,6 +25,34 @@
   var drag = null;
 
   var sortMode = document.getElementById("sortMode");
+
+  function readSpiderfyDemo() {
+    try {
+      var q = new URLSearchParams(window.location.search);
+      if (q.get("demo") === "spiderfy") return true;
+      var f4 = q.get("f4");
+      return f4 === "1" || f4 === "spiderfy";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function isHighlighted(eid) {
+    if (highlightedIds && highlightedIds.length) {
+      for (var i = 0; i < highlightedIds.length; i++) {
+        if (highlightedIds[i] === eid) return true;
+      }
+      return false;
+    }
+    return eid === selectedId;
+  }
+
+  function highlightRestoreOpts() {
+    if (highlightedIds && highlightedIds.length > 1) {
+      return { highlightIds: highlightedIds.slice() };
+    }
+    return {};
+  }
 
   function stateHeights() {
     var app = document.getElementById("app");
@@ -257,6 +298,14 @@
     ).addTo(map);
 
     markerLayer = L.layerGroup().addTo(map);
+    map.on("click", function () {
+      if (!spiderfyDemo || !spiderGroupKey) return;
+      if (Date.now() - spiderOpenedAt < 450) return;
+      collapseSpider();
+    });
+    map.on("zoom viewreset", function () {
+      repositionSpider();
+    });
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -288,10 +337,23 @@
 
   function fitAllMarkers() {
     var bounds = [];
-    Object.keys(markersById).forEach(function (id) {
-      var m = markersById[id];
-      if (m) bounds.push(m.getLatLng());
-    });
+    if (spiderfyDemo) {
+      var seen = {};
+      Object.keys(anchorById).forEach(function (id) {
+        var m = anchorById[id];
+        if (!m) return;
+        var ll = m.getLatLng();
+        var key = ll.lat.toFixed(5) + "," + ll.lng.toFixed(5);
+        if (seen[key]) return;
+        seen[key] = true;
+        bounds.push(ll);
+      });
+    } else {
+      Object.keys(markersById).forEach(function (id) {
+        var m = markersById[id];
+        if (m) bounds.push(m.getLatLng());
+      });
+    }
     if (!bounds.length || !map) return;
     if (bounds.length === 1) {
       map.setView(bounds[0], 16);
@@ -304,10 +366,15 @@
 
   function clearMarkers() {
     markersById = {};
+    anchorById = {};
+    clusterByKey = {};
+    spiderChildren = [];
+    spiderLegs = [];
+    spiderHub = null;
     if (markerLayer) markerLayer.clearLayers();
   }
 
-  function pinIcon(num, selected, state) {
+  function pinIcon(num, selected, state, badgeText) {
     state = state || "upcoming";
     var cls =
       "pin-drop pin-drop--" +
@@ -325,9 +392,14 @@
     } else {
       glyph = '<span class="pin-drop-glyph">' + String(num) + "</span>";
     }
+    var badgeHtml = "";
+    if (badgeText) {
+      cls += " pin-drop--cluster";
+      badgeHtml = '<span class="pin-multi-pill">' + escapeHtml(badgeText) + "</span>";
+    }
     return L.divIcon({
       className: cls,
-      html: '<span class="pin-drop-inner">' + glyph + "</span>",
+      html: '<span class="pin-drop-inner">' + glyph + badgeHtml + "</span>",
       iconSize: [36, 48],
       // Tip of the rotated teardrop (28px box, top 2px, sharp corner down): y = 2+14+14√2 ≈ 35.8
       iconAnchor: [18, 36],
@@ -355,7 +427,7 @@
     var m = L.marker([exam.lat, exam.lng], {
       title: titleBit + " · " + (exam.centreNameZh || exam.subjectNameZh || ""),
       riseOnHover: true,
-      icon: pinIcon(num, exam.id === selectedId, state),
+      icon: pinIcon(num, isHighlighted(exam.id), state),
       keyboard: true,
     });
     m._dseNum = num;
@@ -368,14 +440,326 @@
     return m;
   }
 
+  function groupKeyOf(group) {
+    return group
+      .map(function (item) {
+        return String(item.exam.id);
+      })
+      .sort()
+      .join("|");
+  }
+
+  function groupByLocation(items) {
+    var n = items.length;
+    var parent = new Array(n);
+    var i;
+    for (i = 0; i < n; i++) parent[i] = i;
+    function find(idx) {
+      while (parent[idx] !== idx) {
+        parent[idx] = parent[parent[idx]];
+        idx = parent[idx];
+      }
+      return idx;
+    }
+    function union(a, b) {
+      var ra = find(a);
+      var rb = find(b);
+      if (ra !== rb) parent[rb] = ra;
+    }
+    var byCoord = {};
+    var byCentre = {};
+    for (i = 0; i < n; i++) {
+      var exam = items[i].exam;
+      var ck = Number(exam.lat).toFixed(5) + "," + Number(exam.lng).toFixed(5);
+      if (byCoord[ck] != null) union(i, byCoord[ck]);
+      else byCoord[ck] = i;
+      var code = exam.centreCode == null ? "" : String(exam.centreCode).trim();
+      if (code) {
+        if (byCentre[code] != null) union(i, byCentre[code]);
+        else byCentre[code] = i;
+      }
+    }
+    var buckets = {};
+    var order = [];
+    for (i = 0; i < n; i++) {
+      var root = find(i);
+      if (!buckets[root]) {
+        buckets[root] = [];
+        order.push(root);
+      }
+      buckets[root].push(items[i]);
+    }
+    return order.map(function (root) {
+      return buckets[root];
+    });
+  }
+
+  function groupLatLng(group) {
+    var lat = 0;
+    var lng = 0;
+    group.forEach(function (item) {
+      lat += Number(item.exam.lat);
+      lng += Number(item.exam.lng);
+    });
+    return L.latLng(lat / group.length, lng / group.length);
+  }
+
+  function spiderOffsets(count) {
+    var minChord = 54;
+    var leg;
+    var pts = [];
+    if (count <= 1) return [{ dx: 0, dy: -64 }];
+    if (count === 2) {
+      leg = 80;
+      return [
+        { dx: -leg, dy: -10 },
+        { dx: leg, dy: -10 },
+      ];
+    }
+    var step = Math.PI / (count - 1);
+    leg = minChord / (2 * Math.sin(step / 2));
+    if (leg < 80) leg = 80;
+    if (leg > 132) leg = 132;
+    for (var i = 0; i < count; i++) {
+      var angle = Math.PI - step * i;
+      pts.push({
+        dx: Math.cos(angle) * leg,
+        dy: -Math.sin(angle) * leg - 8,
+      });
+    }
+    return pts;
+  }
+
+  function offsetLatLng(center, dx, dy) {
+    var p = map.latLngToLayerPoint(center);
+    return map.layerPointToLatLng(L.point(p.x + dx, p.y + dy));
+  }
+
+  function refreshClusterIcons() {
+    Object.keys(clusterByKey).forEach(function (key) {
+      var cluster = clusterByKey[key];
+      if (!cluster || !cluster._dseGroup) return;
+      var on = false;
+      for (var i = 0; i < cluster._dseGroup.length; i++) {
+        if (isHighlighted(cluster._dseGroup[i].exam.id)) {
+          on = true;
+          break;
+        }
+      }
+      cluster.setZIndexOffset(on ? 1000 : 420);
+      cluster.setIcon(
+        pinIcon(cluster._dseNum, on, cluster._dseState || "upcoming", cluster._dseBadge)
+      );
+    });
+  }
+
+  function removeSpiderVisuals() {
+    spiderChildren.forEach(function (child) {
+      if (child._dseExamId && markersById[child._dseExamId] === child) {
+        delete markersById[child._dseExamId];
+      }
+      if (markerLayer) markerLayer.removeLayer(child);
+    });
+    spiderLegs.forEach(function (line) {
+      if (markerLayer) markerLayer.removeLayer(line);
+    });
+    if (spiderHub && markerLayer) markerLayer.removeLayer(spiderHub);
+    spiderChildren = [];
+    spiderLegs = [];
+    spiderHub = null;
+  }
+
+  function collapseSpider() {
+    var key = spiderGroupKey;
+    removeSpiderVisuals();
+    spiderGroupKey = null;
+    spiderCenter = null;
+    var cluster = key && clusterByKey[key];
+    if (cluster && markerLayer && !markerLayer.hasLayer(cluster)) {
+      cluster.addTo(markerLayer);
+    }
+    if (cluster) refreshClusterIcons();
+  }
+
+  function repositionSpider() {
+    if (!map || !spiderCenter || !spiderChildren.length) return;
+    spiderChildren.forEach(function (child, i) {
+      var pos = offsetLatLng(spiderCenter, child._spiderDx, child._spiderDy);
+      child.setLatLng(pos);
+      if (spiderLegs[i]) spiderLegs[i].setLatLngs([spiderCenter, pos]);
+    });
+    if (spiderHub) spiderHub.setLatLng(spiderCenter);
+  }
+
+  function openSpider(group) {
+    var key = groupKeyOf(group);
+    if (spiderChildren.length) {
+      var prevKey = spiderGroupKey;
+      removeSpiderVisuals();
+      if (prevKey && prevKey !== key) {
+        var prev = clusterByKey[prevKey];
+        if (prev && markerLayer && !markerLayer.hasLayer(prev)) prev.addTo(markerLayer);
+      }
+    }
+    spiderGroupKey = key;
+    spiderOpenedAt = Date.now();
+    var cluster = clusterByKey[key];
+    var center = cluster ? cluster.getLatLng() : groupLatLng(group);
+    spiderCenter = L.latLng(center.lat, center.lng);
+    if (cluster && markerLayer && markerLayer.hasLayer(cluster)) {
+      markerLayer.removeLayer(cluster);
+    }
+    spiderHub = L.marker(spiderCenter, {
+      icon: L.divIcon({
+        className: "pin-spider-hub",
+        html: '<span class="pin-spider-hub-dot"></span>',
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+      }),
+      keyboard: true,
+      title: "收合",
+      zIndexOffset: 640,
+    });
+    spiderHub.on("click", function (ev) {
+      if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
+      if (Date.now() - spiderOpenedAt < 450) return;
+      collapseSpider();
+    });
+    spiderHub.addTo(markerLayer);
+
+    var offsets = spiderOffsets(group.length);
+    group.forEach(function (item, index) {
+      var off = offsets[index];
+      var pos = offsetLatLng(spiderCenter, off.dx, off.dy);
+      var line = L.polyline([spiderCenter, pos], {
+        color: "#2c2c2c",
+        weight: 2,
+        opacity: 0.45,
+        interactive: false,
+      });
+      line.addTo(markerLayer);
+      spiderLegs.push(line);
+
+      var titleBit = item.state === "done" ? "完" : String(item.num);
+      var selected = isHighlighted(item.exam.id);
+      var child = L.marker(pos, {
+        title: titleBit + " · " + (item.exam.centreNameZh || item.exam.subjectNameZh || ""),
+        riseOnHover: true,
+        icon: pinIcon(item.num, selected, item.state),
+        keyboard: true,
+        zIndexOffset: selected ? 1100 : 860,
+      });
+      child._dseNum = item.num;
+      child._dseState = item.state;
+      child._dseExamId = item.exam.id;
+      child._spiderDx = off.dx;
+      child._spiderDy = off.dy;
+      child.on("click", function (ev) {
+        if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
+        selectExam(item.exam.id, { fromPin: true });
+      });
+      child.addTo(markerLayer);
+      markersById[item.exam.id] = child;
+      spiderChildren.push(child);
+    });
+  }
+
+  function upsertCluster(group) {
+    var head = group[0];
+    var ids = group.map(function (item) {
+      return item.exam.id;
+    });
+    var badge = "共" + group.length;
+    var center = groupLatLng(group);
+    var on = false;
+    for (var i = 0; i < ids.length; i++) {
+      if (isHighlighted(ids[i])) {
+        on = true;
+        break;
+      }
+    }
+    var cluster = L.marker(center, {
+      title: badge + " · " + (head.exam.centreNameZh || head.exam.subjectNameZh || ""),
+      riseOnHover: true,
+      icon: pinIcon(head.num, on, head.state, badge),
+      keyboard: true,
+      zIndexOffset: on ? 1000 : 420,
+    });
+    cluster._dseNum = head.num;
+    cluster._dseState = head.state;
+    cluster._dseBadge = badge;
+    cluster._dseGroup = group;
+    cluster._dseKey = groupKeyOf(group);
+    cluster.on("click", function (ev) {
+      if (ev && ev.originalEvent) L.DomEvent.stopPropagation(ev.originalEvent);
+      var key = cluster._dseKey;
+      if (spiderGroupKey === key) {
+        if (Date.now() - spiderOpenedAt < 450) return;
+        collapseSpider();
+        return;
+      }
+      openSpider(group);
+      selectExam(ids[0], { fromPin: true, highlightIds: ids });
+    });
+    cluster.addTo(markerLayer);
+    clusterByKey[cluster._dseKey] = cluster;
+    return cluster;
+  }
+
+  function placeSpiderfyMarkers(entries, bounds) {
+    groupKeyByExamId = {};
+    var located = [];
+    entries.forEach(function (entry) {
+      if (!hasCoords(entry.exam) || entry.num == null) return;
+      located.push(entry);
+    });
+    var groups = groupByLocation(located);
+    var reopen = null;
+    groups.forEach(function (group) {
+      var key = groupKeyOf(group);
+      group.forEach(function (entry) {
+        groupKeyByExamId[entry.exam.id] = key;
+      });
+      if (group.length < 2) {
+        var single = upsertMarker(group[0].exam, group[0].num, group[0].state);
+        if (single) {
+          anchorById[group[0].exam.id] = single;
+          bounds.push(single.getLatLng());
+        }
+        return;
+      }
+      var cluster = upsertCluster(group);
+      group.forEach(function (entry) {
+        anchorById[entry.exam.id] = cluster;
+      });
+      if (cluster) bounds.push(cluster.getLatLng());
+      if (spiderGroupKey === key) reopen = group;
+    });
+    if (spiderGroupKey && !reopen) {
+      spiderGroupKey = null;
+      spiderCenter = null;
+    }
+    if (reopen) openSpider(reopen);
+  }
+
   function selectExam(id, opts) {
     opts = opts || {};
     selectedId = id;
+    if (opts.highlightIds && opts.highlightIds.length > 1) {
+      highlightedIds = opts.highlightIds.slice();
+    } else {
+      highlightedIds = null;
+    }
+    if (spiderfyDemo && spiderGroupKey && (opts.fromCard || opts.fromPin)) {
+      var stayKey = groupKeyByExamId[id];
+      if (stayKey !== spiderGroupKey) collapseSpider();
+    }
     document.querySelectorAll(".exam-card").forEach(function (card) {
-      var on = card.getAttribute("data-exam-id") === id;
+      var eid = card.getAttribute("data-exam-id");
+      var on = isHighlighted(eid);
       card.classList.toggle("selected", on);
       card.setAttribute("aria-pressed", on ? "true" : "false");
-      if (on && opts.fromPin) {
+      if (on && opts.fromPin && eid === id) {
         card.scrollIntoView({ behavior: "smooth", block: "nearest" });
         if (currentState === 0) applyState(1, true);
       }
@@ -384,13 +768,18 @@
     Object.keys(markersById).forEach(function (eid) {
       var m = markersById[eid];
       if (!m) return;
-      m.setZIndexOffset(eid === id ? 1000 : 0);
+      var on = isHighlighted(eid);
+      m.setZIndexOffset(on ? 1000 : 0);
       if (m._dseNum != null) {
-        m.setIcon(pinIcon(m._dseNum, eid === id, m._dseState || "upcoming"));
+        m.setIcon(pinIcon(m._dseNum, on, m._dseState || "upcoming", m._dseBadge || null));
       }
     });
+    if (spiderfyDemo) refreshClusterIcons();
     if (opts.fromCard) {
       var pin = markersById[id];
+      if (spiderfyDemo && (!pin || pin._spiderDx != null) && anchorById[id]) {
+        pin = anchorById[id];
+      }
       if (pin && map) {
         if (currentState === 2 || currentState === 0) applyState(1, true);
         var ll = pin.getLatLng();
@@ -467,8 +856,8 @@
     card.setAttribute("data-exam-id", exam.id);
     card.setAttribute("role", "button");
     card.setAttribute("tabindex", "0");
-    card.setAttribute("aria-pressed", exam.id === selectedId ? "true" : "false");
-    if (exam.id === selectedId) card.classList.add("selected");
+    card.setAttribute("aria-pressed", isHighlighted(exam.id) ? "true" : "false");
+    if (isHighlighted(exam.id)) card.classList.add("selected");
     if (num != null) card.setAttribute("data-pin-num", String(num));
 
     var d = daysUntil(exam);
@@ -564,6 +953,7 @@
     } else {
       var lastId = findLastExamId(list);
       var pinOrdinal = 0;
+      var entries = [];
       list.forEach(function (exam) {
         var num = null;
         if (hasCoords(exam)) {
@@ -572,16 +962,35 @@
         }
         var state = examPinState(exam, lastId);
         examList.appendChild(renderCard(exam, num, state));
-        var m = upsertMarker(exam, num, state);
-        if (m) bounds.push(m.getLatLng());
+        if (!spiderfyDemo) {
+          var m = upsertMarker(exam, num, state);
+          if (m) bounds.push(m.getLatLng());
+        } else {
+          entries.push({ exam: exam, num: num, state: state });
+        }
       });
+      if (spiderfyDemo) placeSpiderfyMarkers(entries, bounds);
+    }
+
+    if (highlightedIds && highlightedIds.length) {
+      highlightedIds = highlightedIds.filter(function (id) {
+        return list.some(function (e) {
+          return e.id === id;
+        });
+      });
+      if (highlightedIds.length < 2) highlightedIds = null;
+    }
+    if (selectedId && !list.some(function (e) { return e.id === selectedId; })) {
+      selectedId = null;
     }
 
     // N7: do not auto-fit on every render/sort — only 「我的考試」 / first paint
     if (selectedId && markersById[selectedId]) {
-      selectExam(selectedId, {}); // highlight only, no pan
-    } else if (selectedId && !list.some(function (e) { return e.id === selectedId; })) {
-      selectedId = null;
+      selectExam(selectedId, highlightRestoreOpts()); // highlight only, no pan
+    } else if (spiderfyDemo && selectedId && anchorById[selectedId]) {
+      selectExam(selectedId, highlightRestoreOpts());
+    } else if (spiderfyDemo && highlightedIds && highlightedIds.length) {
+      selectExam(highlightedIds[0], highlightRestoreOpts());
     }
   }
 
