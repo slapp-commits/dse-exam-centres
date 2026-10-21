@@ -772,6 +772,28 @@
       btnSave.addEventListener("pointerdown", function () {
         closeAc();
       });
+      // F7: the open list sits above 儲存. Choosing a row releases the list on
+      // mousedown, so the click can land on the button underneath. Swallow that
+      // one click; a later tap on 儲存 (list already closed) still submits (E3).
+      var listPointerDown = false;
+      acList.addEventListener("pointerdown", function () {
+        listPointerDown = true;
+      });
+      document.addEventListener("pointerup", function () {
+        if (!listPointerDown) return;
+        setTimeout(function () {
+          listPointerDown = false;
+        }, 0);
+      });
+      btnSave.addEventListener(
+        "click",
+        function (e) {
+          if (!listPointerDown) return;
+          e.preventDefault();
+          e.stopPropagation();
+        },
+        true
+      );
 
       function showErr(msg) {
         if (!msg) {
@@ -813,6 +835,11 @@ out.push(item);
 
       form.addEventListener("submit", function (e) {
         e.preventDefault();
+        if (listPointerDown) {
+          listPointerDown = false;
+          closeAc();
+          return;
+        }
         closeAc();
         showErr("");
         doSave();

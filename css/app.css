@@ -467,6 +467,7 @@ button.icon-btn {
   top: 100%;
   max-height: min(36vh, 280px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -477,6 +478,8 @@ button.icon-btn {
 
 .ac-list.open {
   display: block;
+  /* F7: paint above the sticky Save bar (z-index 40). display:none once closed, so 儲存 is tappable again (E3). */
+  z-index: 50;
 }
 
 .ac-item {
