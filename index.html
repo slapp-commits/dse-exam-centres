@@ -16,6 +16,13 @@
   <div class="app" id="app">
     <header class="topbar">
       <h1>我的試場</h1>
+      <label class="sort-wrap" for="sortMode">
+        <span class="sort-label">排序</span>
+        <select id="sortMode" aria-label="排序">
+          <option value="input">加入順序</option>
+          <option value="exam">考試時間（由近到遠）</option>
+        </select>
+      </label>
       <div class="overflow">
         <button type="button" class="btn-overflow" id="btnOverflow" aria-label="更多" aria-haspopup="menu" aria-expanded="false" aria-controls="overflowMenu">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
@@ -29,13 +36,6 @@
           <button type="button" class="overflow-item" role="menuitem" id="menuShare">分享</button>
         </div>
       </div>
-      <label class="sort-wrap" for="sortMode">
-        <span class="sort-label">排序</span>
-        <select id="sortMode" aria-label="排序">
-          <option value="input">加入順序</option>
-          <option value="exam">考試時間（由近到遠）</option>
-        </select>
-      </label>
     </header>
 
     <p class="action-toast" id="actionToast" role="status" aria-live="polite" hidden></p>

@@ -2,15 +2,29 @@
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
 }
+/* F6: title stays whole; sort may shrink; ⋮ is the last control on the right. */
 .topbar h1 {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: max-content;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+}
+.sort-wrap {
+  margin-left: auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.sort-wrap select {
+  max-width: min(46vw, 100%);
+  min-width: 0;
+}
+.overflow {
+  flex: 0 0 auto;
 }
 .btn-filter {
   border: 1px solid #ccc;
