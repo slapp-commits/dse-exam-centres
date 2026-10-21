@@ -16,7 +16,19 @@
   <div class="app" id="app">
     <header class="topbar">
       <h1>我的試場</h1>
-      <button type="button" class="btn-help" id="btnInstallHelp" aria-label="安裝或分享">安裝／分享</button>
+      <div class="overflow">
+        <button type="button" class="btn-overflow" id="btnOverflow" aria-label="更多" aria-haspopup="menu" aria-expanded="false" aria-controls="overflowMenu">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <circle cx="12" cy="5" r="1.7"></circle>
+            <circle cx="12" cy="12" r="1.7"></circle>
+            <circle cx="12" cy="19" r="1.7"></circle>
+          </svg>
+        </button>
+        <div class="overflow-menu" id="overflowMenu" role="menu" hidden>
+          <button type="button" class="overflow-item" role="menuitem" id="menuInstall">安裝</button>
+          <button type="button" class="overflow-item" role="menuitem" id="menuShare">分享</button>
+        </div>
+      </div>
       <label class="sort-wrap" for="sortMode">
         <span class="sort-label">排序</span>
         <select id="sortMode" aria-label="排序">
@@ -25,6 +37,8 @@
         </select>
       </label>
     </header>
+
+    <p class="action-toast" id="actionToast" role="status" aria-live="polite" hidden></p>
 
     <div class="install-tip" id="installTip" role="status">
       想離線／更快開啟？可加到主畫面，或分享連結俾同學。

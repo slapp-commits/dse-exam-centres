@@ -704,6 +704,7 @@ button.icon-btn {
   gap: 6px;
   font-size: 13px;
   color: var(--muted);
+  flex-shrink: 0;
 }
 .sort-wrap select {
   font-size: 13px;
@@ -737,15 +738,82 @@ button.icon-btn {
 
 
 /* Soft launch: install / share */
-.btn-help {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
+.overflow {
+  position: relative;
+  flex: 0 0 auto;
+}
+.btn-overflow {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 0;
   color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-overflow svg {
+  display: block;
+  fill: currentColor;
+}
+.btn-overflow:hover,
+.btn-overflow[aria-expanded="true"] {
+  background: #f0f0f0;
+}
+.overflow-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 132px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  z-index: 60;
+}
+.overflow-menu[hidden] {
+  display: none !important;
+}
+.overflow-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.overflow-item:hover,
+.overflow-item:focus {
+  background: #f3f3f3;
+  outline: none;
+}
+.action-toast {
+  position: absolute;
+  left: 50%;
+  top: 62px;
+  transform: translateX(-50%);
+  z-index: 70;
+  margin: 0;
+  background: #111;
+  color: #fff;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  line-height: 1.2;
   white-space: nowrap;
-  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.action-toast[hidden] {
+  display: none !important;
 }
 .install-sheet {
   position: fixed;
@@ -871,9 +939,6 @@ button.icon-btn {
 .pin-drop--done .pin-drop-inner::before {
   background: #9a8a9e;
 }
-.pin-drop--last .pin-drop-inner::before {
-  background: #7ec8a3;
-}
 .pin-drop.is-selected .pin-drop-inner::before {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95), 0 0 0 6px rgba(17, 17, 17, 0.22),
     0 2px 8px rgba(0, 0, 0, 0.3);
@@ -893,11 +958,6 @@ button.icon-btn {
   align-items: center;
   letter-spacing: 0.02em;
 }
-.pin-drop-glyph--last {
-  flex-direction: row;
-  gap: 1px;
-  font-size: 13px;
-}
 .pin-drop-check {
   font-size: 12px;
   line-height: 1;
@@ -906,14 +966,6 @@ button.icon-btn {
   font-size: 9px;
   line-height: 1;
   margin-top: 1px;
-}
-.pin-drop-ray {
-  display: inline-block;
-  width: 5px;
-  height: 1.5px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 1px;
-  box-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
 }
 
 .exam-card {
@@ -949,11 +1001,6 @@ button.icon-btn {
   color: #6e6274;
   border-color: #9a8a9e;
   font-size: 11px;
-}
-.card-pin-badge--last {
-  background: #eef8f3;
-  color: #2f7a5a;
-  border-color: #7ec8a3;
 }
 .exam-card.selected .card-pin-badge {
   box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.18);
