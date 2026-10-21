@@ -1090,21 +1090,11 @@
       copyShareUrl();
     }
   }
-  var btnShareApp = document.getElementById("btnShareApp");
-  if (btnShareApp) btnShareApp.addEventListener("click", shareApp);
   var menuShare = document.getElementById("menuShare");
   if (menuShare) menuShare.addEventListener("click", shareApp);
   function copyShareUrl() {
     var ok = function () {
-      var b = document.getElementById("btnCopyLink");
-      var sheetOpen = installSheet && installSheet.classList.contains("open");
-      if (b && sheetOpen) {
-        var old = b.textContent;
-        b.textContent = "已複製";
-        setTimeout(function () { b.textContent = old; }, 1200);
-      } else {
-        showToast("已複製連結");
-      }
+      showToast("已複製連結");
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(SHARE_URL).then(ok).catch(function () {
@@ -1114,8 +1104,6 @@
       window.prompt("複製呢條連結：", SHARE_URL);
     }
   }
-  var btnCopyLink = document.getElementById("btnCopyLink");
-  if (btnCopyLink) btnCopyLink.addEventListener("click", copyShareUrl);
 
   try {
     if (!localStorage.getItem(TIP_KEY) && installTip) {
