@@ -170,28 +170,8 @@
     return end != null && end < Date.now();
   }
 
-  function findLastExamId(list) {
-    var bestId = null;
-    var bestEnd = -Infinity;
-    var bestCreated = -Infinity;
-    (list || []).forEach(function (exam) {
-      if (isExamDone(exam)) return;
-      var end = examEndTs(exam);
-      if (end == null) return;
-      var created = Date.parse(exam.createdAt || "") || 0;
-      if (end > bestEnd || (end === bestEnd && created > bestCreated)) {
-        bestEnd = end;
-        bestCreated = created;
-        bestId = exam.id;
-      }
-    });
-    return bestId;
-  }
-
-  function examPinState(exam, lastId) {
-    if (isExamDone(exam)) return "done";
-    if (lastId && exam.id === lastId) return "last";
-    return "upcoming";
+  function examPinState(exam) {
+    return isExamDone(exam) ? "done" : "upcoming";
   }
 
   function formatDate(iso) {
@@ -354,7 +334,7 @@
   }
 
   function pinIcon(num, selected, state, badgeText) {
-    state = state || "upcoming";
+    state = state === "done" ? "done" : "upcoming";
     var cls =
       "pin-drop pin-drop--" +
       state +
@@ -363,11 +343,6 @@
     if (state === "done") {
       glyph =
         '<span class="pin-drop-glyph"><span class="pin-drop-check">✓</span><span class="pin-drop-done-label">完</span></span>';
-    } else if (state === "last") {
-      glyph =
-        '<span class="pin-drop-glyph pin-drop-glyph--last"><span class="pin-drop-ray" aria-hidden="true"></span>' +
-        String(num) +
-        '<span class="pin-drop-ray" aria-hidden="true"></span></span>';
     } else {
       glyph = '<span class="pin-drop-glyph">' + String(num) + "</span>";
     }
@@ -658,8 +633,29 @@
     });
   }
 
+  // Collapsed hub: next not-yet-done exam at this address, by exam start.
+  // ✓完 only when every exam in the group is already finished.
+  function clusterHub(group) {
+    var best = null;
+    var bestTs = Infinity;
+    for (var i = 0; i < group.length; i++) {
+      var item = group[i];
+      if (!item || isExamDone(item.exam)) continue;
+      var ts = earliestTs(item.exam);
+      var num = item.num == null ? Infinity : item.num;
+      var bestNum = !best || best.num == null ? Infinity : best.num;
+      if (!best || ts < bestTs || (ts === bestTs && num < bestNum)) {
+        best = item;
+        bestTs = ts;
+      }
+    }
+    if (best) return { num: best.num, state: "upcoming", exam: best.exam };
+    var doneHead = group[0];
+    return { num: doneHead.num, state: "done", exam: doneHead.exam };
+  }
+
   function upsertCluster(group) {
-    var head = group[0];
+    var hub = clusterHub(group);
     var ids = group.map(function (item) {
       return item.exam.id;
     });
@@ -673,14 +669,14 @@
       }
     }
     var cluster = L.marker(center, {
-      title: badge + " · " + (head.exam.centreNameZh || head.exam.subjectNameZh || ""),
+      title: badge + " · " + (hub.exam.centreNameZh || hub.exam.subjectNameZh || ""),
       riseOnHover: true,
-      icon: pinIcon(head.num, on, head.state, badge),
+      icon: pinIcon(hub.num, on, hub.state, badge),
       keyboard: true,
       zIndexOffset: on ? 1000 : 420,
     });
-    cluster._dseNum = head.num;
-    cluster._dseState = head.state;
+    cluster._dseNum = hub.num;
+    cluster._dseState = hub.state;
     cluster._dseBadge = badge;
     cluster._dseGroup = group;
     cluster._dseKey = groupKeyOf(group);
@@ -871,15 +867,10 @@
       })
       .join("");
 
-    state = state || "upcoming";
+    state = state === "done" ? "done" : "upcoming";
     var badgeHtml = "";
     if (num != null) {
-      var badgeGlyph =
-        state === "done"
-          ? "✓完"
-          : state === "last"
-            ? "✦" + String(num)
-            : String(num);
+      var badgeGlyph = state === "done" ? "✓完" : String(num);
       badgeHtml =
         '<span class="card-pin-badge card-pin-badge--' +
         state +
@@ -945,7 +936,6 @@
           : "尚未加入考試。";
       examList.appendChild(empty);
     } else {
-      var lastId = findLastExamId(list);
       var pinOrdinal = 0;
       var entries = [];
       list.forEach(function (exam) {
@@ -954,7 +944,7 @@
           pinOrdinal += 1;
           num = pinOrdinal;
         }
-        var state = examPinState(exam, lastId);
+        var state = examPinState(exam);
         examList.appendChild(renderCard(exam, num, state));
         entries.push({ exam: exam, num: num, state: state });
       });
@@ -1004,9 +994,29 @@
   var TIP_KEY = "dse_install_tip_v1";
   var installSheet = document.getElementById("installSheet");
   var installTip = document.getElementById("installTip");
-  var btnInstallHelp = document.getElementById("btnInstallHelp");
+  var btnOverflow = document.getElementById("btnOverflow");
+  var overflowMenu = document.getElementById("overflowMenu");
+  var toastTimer = null;
+
+  function showToast(msg) {
+    var el = document.getElementById("actionToast");
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      el.hidden = true;
+    }, 1400);
+  }
+
+  function setOverflowOpen(open) {
+    if (!overflowMenu || !btnOverflow) return;
+    overflowMenu.hidden = !open;
+    btnOverflow.setAttribute("aria-expanded", open ? "true" : "false");
+  }
 
   function openInstallSheet() {
+    setOverflowOpen(false);
     if (!installSheet) return;
     installSheet.classList.add("open");
     installSheet.setAttribute("aria-hidden", "false");
@@ -1017,8 +1027,31 @@
     installSheet.setAttribute("aria-hidden", "true");
   }
 
-  if (btnInstallHelp) {
-    btnInstallHelp.addEventListener("click", openInstallSheet);
+  if (btnOverflow) {
+    btnOverflow.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = overflowMenu && overflowMenu.hidden;
+      setOverflowOpen(!!open);
+    });
+  }
+  if (overflowMenu) {
+    overflowMenu.addEventListener("click", function (e) {
+      e.stopPropagation();
+    });
+  }
+  document.addEventListener("click", function () {
+    setOverflowOpen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || !overflowMenu || overflowMenu.hidden) return;
+    setOverflowOpen(false);
+    if (btnOverflow) btnOverflow.focus();
+  });
+  var menuInstall = document.getElementById("menuInstall");
+  if (menuInstall) {
+    menuInstall.addEventListener("click", function () {
+      openInstallSheet();
+    });
   }
   var tipOpen = document.getElementById("tipOpenHelp");
   var tipDismiss = document.getElementById("tipDismiss");
@@ -1043,29 +1076,34 @@
   var btnCloseInstall = document.getElementById("btnCloseInstall");
   if (btnCloseInstall) btnCloseInstall.addEventListener("click", closeInstallSheet);
 
-  var btnShareApp = document.getElementById("btnShareApp");
-  if (btnShareApp) {
-    btnShareApp.addEventListener("click", function () {
-      if (navigator.share) {
-        navigator
-          .share({
-            title: "我的試場",
-            text: "我的試場 — DSE 試場地圖",
-            url: SHARE_URL,
-          })
-          .catch(function () {});
-      } else {
-        copyShareUrl();
-      }
-    });
+  function shareApp() {
+    setOverflowOpen(false);
+    if (navigator.share) {
+      navigator
+        .share({
+          title: "我的試場",
+          text: "我的試場 — DSE 試場地圖",
+          url: SHARE_URL,
+        })
+        .catch(function () {});
+    } else {
+      copyShareUrl();
+    }
   }
+  var btnShareApp = document.getElementById("btnShareApp");
+  if (btnShareApp) btnShareApp.addEventListener("click", shareApp);
+  var menuShare = document.getElementById("menuShare");
+  if (menuShare) menuShare.addEventListener("click", shareApp);
   function copyShareUrl() {
     var ok = function () {
       var b = document.getElementById("btnCopyLink");
-      if (b) {
+      var sheetOpen = installSheet && installSheet.classList.contains("open");
+      if (b && sheetOpen) {
         var old = b.textContent;
         b.textContent = "已複製";
         setTimeout(function () { b.textContent = old; }, 1200);
+      } else {
+        showToast("已複製連結");
       }
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
