@@ -77,7 +77,7 @@
       <p class="data-source" id="dataSource">
         <span class="src-kicker">資料來源</span>
         <span class="src-line"><a href="https://www.hkeaa.edu.hk/tc/hkdse/admin/exam_centres/exam_centres.html" target="_blank" rel="noopener">考評局 — 試場一覽表</a></span>
-        <span class="src-line"><a href="https://www.hkeaa.edu.hk/DocLibrary/Circulars/HKDSE/HKDSE_Exam_Circular_No8_2027_Examination_Timetable_and_Date_of_Release_of_Results_C.pdf" target="_blank" rel="noopener">暫定時間表 · 考評局通告 (8) 2025/2026，2026-05-22</a></span>
+        <span class="src-line"><a href="https://www.hkeaa.edu.hk/DocLibrary/Circulars/HKDSE/HKDSE_Finalised_Examination_Timetable_for_2027_Examination.pdf" target="_blank" rel="noopener">定稿時間表 · 考評局，2026-11-06</a></span>
       </p>
     </form>
   </div>
@@ -145,7 +145,7 @@
         );
       }
 
-      /* Centres list + timetable. Text and provisional status come from SAMPLE.meta. */
+      /* Centres list + timetable. Wording comes from SAMPLE.meta. */
       function renderDataSource() {
         var el = document.getElementById("dataSource");
         if (!el || !window.SAMPLE || !SAMPLE.meta) return;
@@ -157,7 +157,11 @@
         var status = meta.timetableStatus || "";
         var kind =
           meta.timetableSourceLabelZh ||
-          (status === "provisional" ? "暫定時間表" : "考試時間表");
+          (status === "provisional"
+            ? "暫定時間表"
+            : status === "finalised"
+              ? "定稿時間表"
+              : "考試時間表");
         if (status === "provisional" && kind.indexOf("暫定") < 0) {
           kind += "（暫定）";
         }
